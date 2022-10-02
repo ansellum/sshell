@@ -5,16 +5,40 @@
 
 #define CMDLINE_MAX 512
 
+ /* Executes an external command with fork(), exec(), & wait() (phase 1)*/
+void executeExternalProcess(char *cmd) 
+{
+        int pid;
+        int childStatus;
+    
+        pid = fork();
+        //child process should execute the command (takes no arguments yet)
+        if (pid == 0) {
+                execlp(cmd, cmd, (char *) NULL);
+                exit(1); //if child reaches this line it means there was an issue running command
+        }
+        //parent process should wait for child to execute
+        else if (pid > 0) {
+                wait(&childStatus);
+                //print error status of child process to stderr
+                if (!WEXITSTATUS(childStatus)) fprintf(stderr, "+ completed '%s' [%d]\n",cmd, 0); //if child process is successful
+                else fprintf(stderr, "+ completed '%s' [%d]\n",cmd, 1);
+        }
+        //handle error with fork()
+        else fprintf(stderr, "error completing fork() [%d]\n", 1);
+
+        return;
+}
+
 int main(void)
 {
         char cmd[CMDLINE_MAX];
 
         while (1) {
                 char *nl;
-                int retval;
-
+        
                 /* Print prompt */
-                printf("sshell$ ");
+                printf("sshell@ucd$ ");
                 fflush(stdout);
 
                 /* Get command line */
@@ -28,20 +52,16 @@ int main(void)
 
                 /* Remove trailing newline from command line */
                 nl = strchr(cmd, '\n');
-                if (nl)
-                        *nl = '\0';
+                if (nl) *nl = '\0';
 
                 /* Builtin command */
                 if (!strcmp(cmd, "exit")) {
                         fprintf(stderr, "Bye...\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n",cmd, 0);
                         break;
                 }
-
-                /* Regular command */
-                retval = system(cmd);
-                fprintf(stdout, "Return status value for '%s': %d\n",
-                        cmd, retval);
+                else executeExternalProcess(cmd);
         }
-
+        
         return EXIT_SUCCESS;
 }
