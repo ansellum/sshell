@@ -8,21 +8,21 @@
 
 struct commandObj {
         char* program;
-        char* arguments[16][32];    //Array of 16 strings (0-15) that holds 32 characters each
+        char arguments[16][32];    //Array of 16 strings (0-15) that holds 32 characters each
 };
 
-parseCommand(struct commandObj* obj, char *command) {
+void parseCommand(struct commandObj* obj, char *command) {
         const char delimiter[2] = " ";
         char* token;
         int index = 0;
 
         //get the first token and stuff it in the program property 
-        char* token = strtok(command, s);
+        token = strtok(command, delimiter);
         obj->program = token;
 
         //pass the arguments into the arguments array
         while (token != NULL) {
-                obj->arguments[index] = token;
+                strcpy(obj->arguments[index], token);
 
                 //update token to next argument
                 token = strtok(NULL, delimiter);
