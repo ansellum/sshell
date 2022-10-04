@@ -47,6 +47,7 @@ void executeExternalProcess(char *cmdString)
         int pid;
         int childStatus;
         commandObj cmd;
+
         parseCommand(&cmd, cmdString);
         pid = fork();
         //child process should execute the command (takes no arguments yet)
