@@ -41,14 +41,43 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
         cmd->arguments[i] = NULL;
 }
 
+struct commandObj {
+        char* program;
+        char* arguments[16][32];    //Array of 16 strings (0-15) that holds 32 characters each
+};
+
+parseCommand(struct commandObj* obj, char *command) {
+        const char delimiter[2] = " ";
+        char* token;
+        int index = 0;
+
+        //get the first token and stuff it in the program property 
+        char* token = strtok(command, s);
+        obj->program = token;
+
+        //pass the arguments into the arguments array
+        while (token != NULL) {
+                obj->arguments[index] = token;
+
+                //update token to next argument
+                token = strtok(NULL, delimiter);
+
+                index++;
+        }
+}
+
  /* Executes an external command with fork(), exec(), & wait() (phase 1)*/
 void executeExternalProcess(char *cmdString) 
 {
         int pid;
         int childStatus;
+<<<<<<< HEAD
         commandObj cmd;
 
         parseCommand(&cmd, cmdString);
+=======
+
+>>>>>>> main
         pid = fork();
         //child process should execute the command (takes no arguments yet)
         if (pid == 0) {
