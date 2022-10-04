@@ -17,6 +17,7 @@ typedef struct commandObj {
 void parseCommand(struct commandObj* cmd, char *cmdString)
 {
         char delim[] = " ";
+        char* quotes = "\'\"";
         char* token;
 
         //make editable string from literal
@@ -28,13 +29,19 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
         cmd->program = token;
         cmd->arguments[0] = token;
 
-        //parse the arguments using strsep()
+        //parse the rest of the command
         int i = 1;
-        while ( (token = strsep(&buf, delim)) != NULL) {
-                //skip extra spaces
-                while (strlen(token) == 0) token = strsep(&buf, delim);
+        while (buf != NULL) {
+                /* Check for special cases first */
+                while (strlen(token) == 0) token = strsep(&buf, delim); //Extra spaces
+                if (buf[0] == '\'' || buf[0] == '\"') //Quotations
+                {
+                        buf++;
+                        token = strsep(&buf, quotes);
+                }
+                else token = strsep(&buf, delim);
 
-                //update command arguments
+                //pass token into command arguments
                 cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd->arguments[i], token);
 
