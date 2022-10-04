@@ -23,18 +23,21 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
         char* buf = malloc(CMDLINE_MAX * sizeof(char));
         strcpy(buf, cmdString); 
 
-        //get the first token and stuff it in the program property 
-        token = strtok(buf, delim);
+        //pass program name into command object
+        token = strsep(&buf, delim);
         cmd->program = token;
+        cmd->arguments[0] = token;
 
-        //fill arguments array (program name is first in argument list; see execvp() man)
-        int i = 0;
-        while (token != NULL) {
+        //parse the arguments using strsep()
+        int i = 1;
+        while ( (token = strsep(&buf, delim)) != NULL) {
+                //skip extra spaces
+                while (strlen(token) == 0) token = strsep(&buf, delim);
+
+                //update command arguments
                 cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd->arguments[i], token);
 
-                //update token to next argument
-                token = strtok(NULL, delim);
                 i++;
         }
         //End arguments array with NULL for execvp() detection
