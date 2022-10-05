@@ -31,7 +31,7 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
 
         //parse the rest of the command
         int i = 1;
-        while (buf != NULL) {
+        while (buf != NULL && strlen(buf) != 0) {
                 /* Check for special cases first */
                 while (buf[0] == ' ') token = strsep(&buf, delim); //Extra spaces
                 if (buf[0] == '\'' || buf[0] == '\"') //Quotations
@@ -42,9 +42,9 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
                 else token = strsep(&buf, delim);
 
                 //pass token into command arguments
+                if (token == NULL) break;
                 cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd->arguments[i], token);
-
                 i++;
         }
         //End arguments array with NULL for execvp() detection
