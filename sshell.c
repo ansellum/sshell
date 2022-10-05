@@ -17,34 +17,24 @@ typedef struct commandObj {
 void parseCommand(struct commandObj* cmd, char *cmdString)
 {
         char delim[] = " ";
-        char* quotes = "\'\"";
         char* token;
 
         //make editable string from literal
         char* buf = malloc(CMDLINE_MAX * sizeof(char));
         strcpy(buf, cmdString); 
 
-        //pass program name into command object
-        token = strsep(&buf, delim);
+        //get the first token and stuff it in the program property 
+        token = strtok(buf, delim);
         cmd->program = token;
-        cmd->arguments[0] = token;
 
-        //parse the rest of the command
-        int i = 1;
-        while (buf != NULL && strlen(buf) != 0) {
-                /* Check for special cases first */
-                while (buf[0] == ' ') token = strsep(&buf, delim); //Extra spaces
-                if (buf[0] == '\'' || buf[0] == '\"') { //Quotations
-                        buf++;
-                        token = strsep(&buf, quotes);
-                }
-                //update token
-                else token = strsep(&buf, delim); 
-
-                //pass token into command arguments
-                if (strlen(token) == 0) break;
+        //fill arguments array (program name is first in argument list; see execvp() man)
+        int i = 0;
+        while (token != NULL) {
                 cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd->arguments[i], token);
+
+                //update token to next argument
+                token = strtok(NULL, delim);
                 i++;
         }
         //End arguments array with NULL for execvp() detection
