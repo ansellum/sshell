@@ -33,7 +33,7 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
         int i = 1;
         while (buf != NULL) {
                 /* Check for special cases first */
-                while (strlen(token) == 0) token = strsep(&buf, delim); //Extra spaces
+                while (buf[0] == ' ') token = strsep(&buf, delim); //Extra spaces
                 if (buf[0] == '\'' || buf[0] == '\"') //Quotations
                 {
                         buf++;
