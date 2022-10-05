@@ -42,7 +42,6 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
                 else token = strsep(&buf, delim); 
 
                 //pass token into command arguments
-                if (token == NULL) break;
                 cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd->arguments[i], token);
                 i++;
