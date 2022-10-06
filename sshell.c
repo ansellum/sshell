@@ -13,6 +13,15 @@ typedef struct commandObj {
         char* arguments[NUMARGS_MAX];
 }commandObj;
 
+/*Function to print current working directory*/
+void printWorkingDirectory() {
+        char cwd[CMDLINE_MAX];
+
+        getcwd(cwd, sizeof(cwd));
+        printf("%s\n", cwd);
+        printf("+ completed 'pwd' [0]\n");
+}
+
 /* Parses command into commandObj properties */
 void parseCommand(struct commandObj* cmd, char *cmdString)
 {
@@ -21,9 +30,9 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
 
         //make editable string from literal
         char* buf = malloc(CMDLINE_MAX * sizeof(char));
-        strcpy(buf, cmdString); 
+        strcpy(buf, cmdString);
 
-        //get the first token and stuff it in the program property 
+        //get the first token and stuff it in the program property
         token = strtok(buf, delim);
         cmd->program = token;
 
@@ -42,7 +51,7 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
 }
 
  /* Executes an external command with fork(), exec(), & wait() (phase 1)*/
-void executeExternalProcess(char *cmdString) 
+void executeExternalProcess(char *cmdString)
 {
         int pid;
         int childStatus;
@@ -51,17 +60,17 @@ void executeExternalProcess(char *cmdString)
         parseCommand(&cmd, cmdString);
 
         pid = fork();
-        //child process should execute the command (takes no arguments yet)
+        //child process should execute the command
         if (pid == 0) {
                 childStatus = execvp(cmd.program, cmd.arguments);
-                exit(1); //if child reaches this line it means there was an issue running command
+                exit(1); //if child reaches this line it means there was an issue running exec command
         }
         //parent process should wait for child to execute
         else if (pid > 0) {
                 waitpid(pid, &childStatus, 0);
                 printf("+ completed '%s' [%d]\n", cmdString, childStatus);
         }
-        //handle error with fork()
+        //fork() command failed
         else fprintf(stderr, "error completing fork() [%d]\n", 1);
 
         return;
@@ -73,7 +82,7 @@ int main(void)
 
         while (1) {
                 char *nl;
-        
+       
                 /* Print prompt */
                 printf("sshell@ucd$ ");
                 fflush(stdout);
@@ -91,14 +100,17 @@ int main(void)
                 nl = strchr(cmdString, '\n');
                 if (nl) *nl = '\0';
 
-                /* Builtin command */
+                /* Builtin command "exit"*/
                 if (!strcmp(cmdString, "exit")) {
                         fprintf(stderr, "Bye...\n");
                         fprintf(stderr, "+ completed '%s' [%d]\n",cmdString, 0);
                         break;
                 }
+                /* Builtin command "pwd"*/
+                else if (!strcmp(cmdString, "pwd"))
+                        printWorkingDirectory();
                 else executeExternalProcess(cmdString);
         }
-        
+       
         return EXIT_SUCCESS;
 }
