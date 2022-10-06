@@ -13,13 +13,23 @@ typedef struct commandObj {
         char* arguments[NUMARGS_MAX];
 }commandObj;
 
-/*Function to print current working directory*/
-void printWorkingDirectory() {
+/*Change directory*/
+void changeDirectory(char *commandArguments[]) 
+{
+        chdir(commandArguments[1]);
+        printf("+ completed 'cd' [0]\n");
+        return;
+}
+
+/*Print current working directory*/
+void printWorkingDirectory() 
+{
         char cwd[CMDLINE_MAX];
 
         getcwd(cwd, sizeof(cwd));
         printf("%s\n", cwd);
         printf("+ completed 'pwd' [0]\n");
+        return;
 }
 
 /* Parses command into commandObj properties */
@@ -58,6 +68,12 @@ void executeExternalProcess(char *cmdString)
         commandObj cmd;
 
         parseCommand(&cmd, cmdString);
+       
+        //check if builtin command "cd" is called, utilizes parseCommand functionality
+        if (!strcmp(cmd.program, "cd")) {
+                changeDirectory(cmd.arguments);
+                return;
+        }
 
         pid = fork();
         //child process should execute the command
