@@ -5,27 +5,88 @@
 #include <unistd.h>
 
 #define CMDLINE_MAX 512
+#define NUMARGS_MAX 16
+#define ARGLENGTH_MAX 32
+
+typedef struct commandObj {
+        char* program;
+        char* arguments[NUMARGS_MAX];
+}commandObj;
+
+/*Change directory*/
+void changeDirectory(char *commandArguments[]) 
+{
+        chdir(commandArguments[1]);
+        printf("+ completed 'cd' [0]\n");
+        return;
+}
+
+/*Print current working directory*/
+void printWorkingDirectory() 
+{
+        char cwd[CMDLINE_MAX];
+
+        getcwd(cwd, sizeof(cwd));
+        printf("%s\n", cwd);
+        printf("+ completed 'pwd' [0]\n");
+        return;
+}
+
+/* Parses command into commandObj properties */
+void parseCommand(struct commandObj* cmd, char *cmdString)
+{
+        char delim[] = " ";
+        char* token;
+
+        //make editable string from literal
+        char* buf = malloc(CMDLINE_MAX * sizeof(char));
+        strcpy(buf, cmdString);
+
+        //get the first token and stuff it in the program property
+        token = strtok(buf, delim);
+        cmd->program = token;
+
+        //fill arguments array (program name is first in argument list; see execvp() man)
+        int i = 0;
+        while (token != NULL) {
+                cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
+                strcpy(cmd->arguments[i], token);
+
+                //update token to next argument
+                token = strtok(NULL, delim);
+                i++;
+        }
+        //End arguments array with NULL for execvp() detection
+        cmd->arguments[i] = NULL;
+}
 
  /* Executes an external command with fork(), exec(), & wait() (phase 1)*/
-void executeExternalProcess(char *cmd) 
+void executeExternalProcess(char *cmdString)
 {
         int pid;
         int childStatus;
-    
+        commandObj cmd;
+
+        parseCommand(&cmd, cmdString);
+       
+        //check if builtin command "cd" is called, utilizes parseCommand functionality
+        if (!strcmp(cmd.program, "cd")) {
+                changeDirectory(cmd.arguments);
+                return;
+        }
+
         pid = fork();
-        //child process should execute the command (takes no arguments yet)
+        //child process should execute the command
         if (pid == 0) {
-                execlp(cmd, cmd, (char *) NULL);
-                exit(1); //if child reaches this line it means there was an issue running command
+                childStatus = execvp(cmd.program, cmd.arguments);
+                exit(1); //if child reaches this line it means there was an issue running exec command
         }
         //parent process should wait for child to execute
         else if (pid > 0) {
-                wait(&childStatus);
-                //print error status of child process to stderr
-                if (!WEXITSTATUS(childStatus)) fprintf(stderr, "+ completed '%s' [%d]\n",cmd, 0); //if child process is successful
-                else fprintf(stderr, "+ completed '%s' [%d]\n",cmd, 1);
+                waitpid(pid, &childStatus, 0);
+                printf("+ completed '%s' [%d]\n", cmdString, childStatus);
         }
-        //handle error with fork()
+        //fork() command failed
         else fprintf(stderr, "error completing fork() [%d]\n", 1);
 
         return;
@@ -33,36 +94,39 @@ void executeExternalProcess(char *cmd)
 
 int main(void)
 {
-        char cmd[CMDLINE_MAX];
+        char cmdString[CMDLINE_MAX];
 
         while (1) {
                 char *nl;
-        
+       
                 /* Print prompt */
                 printf("sshell@ucd$ ");
                 fflush(stdout);
 
                 /* Get command line */
-                fgets(cmd, CMDLINE_MAX, stdin);
+                fgets(cmdString, CMDLINE_MAX, stdin);
 
                 /* Print command line if stdin is not provided by terminal */
                 if (!isatty(STDIN_FILENO)) {
-                        printf("%s", cmd);
+                        printf("%s", cmdString);
                         fflush(stdout);
                 }
 
                 /* Remove trailing newline from command line */
-                nl = strchr(cmd, '\n');
+                nl = strchr(cmdString, '\n');
                 if (nl) *nl = '\0';
 
-                /* Builtin command */
-                if (!strcmp(cmd, "exit")) {
+                /* Builtin command "exit"*/
+                if (!strcmp(cmdString, "exit")) {
                         fprintf(stderr, "Bye...\n");
-                        fprintf(stderr, "+ completed '%s' [%d]\n",cmd, 0);
+                        fprintf(stderr, "+ completed '%s' [%d]\n",cmdString, 0);
                         break;
                 }
-                else executeExternalProcess(cmd);
+                /* Builtin command "pwd"*/
+                else if (!strcmp(cmdString, "pwd"))
+                        printWorkingDirectory();
+                else executeExternalProcess(cmdString);
         }
-        
+       
         return EXIT_SUCCESS;
 }
