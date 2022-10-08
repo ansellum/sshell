@@ -141,7 +141,7 @@ int main(void)
                 else if (!strcmp(cmdString, "pwd"))
                 {
                         printWorkingDirectory();
-                        fprintf(stderr, "+ completed %s [0]\n", cmdString);
+                        fprintf(stderr, "+ completed '%s' [0]\n", cmdString);
                 }
                 else executeExternalProcess(cmdString);
         }
