@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #define CMDLINE_MAX 512
 #define NUMARGS_MAX 16
@@ -43,23 +44,33 @@ int parseCommand(struct commandObj* cmd, char *cmdString)
 {
         char delim[] = " ";
         char* token;
+        int i = 1;
 
         //make editable string from literal
         char* buf = malloc(CMDLINE_MAX * sizeof(char));
         strcpy(buf, cmdString);
 
-        //get the first token and stuff it in the program property
-        token = strtok(buf, delim);
+        //pass program name into command object
+        token = strsep(&buf, delim);
         cmd->program = token;
+        cmd->arguments[0] = token;
+
+        printf("buf: %s\n", buf);
 
         //fill arguments array (program name is first in argument list; see execvp() man)
-        int i = 0;
-        while (token != NULL) {
+        while ( buf != NULL && strlen(buf) != 0) {
+                //skip extra spaces
+                printf("buf: %s\n", buf);
+                while (buf[0] == ' ') token = strsep(&buf, delim);
+
+                //update token
+                token = strsep(&buf, delim);
+
+                //pass command arguments
+                if (strlen(token) == 0) break;
                 cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd->arguments[i], token);
 
-                //update token to next argument
-                token = strtok(NULL, delim);
                 i++;
         }
         //End arguments array with NULL for execvp() detection
@@ -98,7 +109,8 @@ void executeExternalProcess(char *cmdString)
         //parent process should wait for child to execute
         else if (pid > 0) {
                 waitpid(pid, &childStatus, 0);
-                if(childStatus) fprintf(stderr, "Error: command not found\n");
+                //Check if command ran successfully (assuming no wrong arguments, a failure = command not found)
+                if (childStatus) fprintf(stderr, "Error: command not found\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, childStatus);
         }
         //fork() command failed
