@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define CMDLINE_MAX 512
 #define NUMARGS_MAX 16
@@ -16,8 +17,15 @@ typedef struct commandObj {
 /*Change directory*/
 void changeDirectory(char *commandArguments[]) 
 {
-        chdir(commandArguments[1]);
-        fprintf(stderr, "+ completed 'cd' [0]\n");
+        int status;
+
+        status = chdir(commandArguments[1]);
+        if (status)
+        {
+                fprintf(stderr, "Error: cannot cd into directory\n");
+                status = 1;
+        }
+        fprintf(stderr, "+ completed 'cd' [%d]\n", status);
         return;
 }
 
@@ -84,6 +92,11 @@ void executeExternalProcess(char *cmdString)
         //parent process should wait for child to execute
         else if (pid > 0) {
                 waitpid(pid, &childStatus, 0);
+                if (childStatus != 0)
+                {
+                        fprintf(stderr, "Error: command not found\n");
+                        childStatus = 1;
+                }
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, childStatus);
         }
         //fork() command failed
