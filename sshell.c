@@ -11,7 +11,7 @@
 
 typedef struct commandObj {
         char* program;
-        char* arguments[NUMARGS_MAX];
+        char* arguments[NUMARGS_MAX + 1]; // +1 for program name
 }commandObj;
 
 /*Change directory*/
@@ -40,8 +40,8 @@ void printWorkingDirectory()
         return;
 }
 
-/* Parses command into commandObj properties */
-void parseCommand(struct commandObj* cmd, char *cmdString)
+/* Parses command into commandObj properties; returns number of arguments */
+int parseCommand(struct commandObj* cmd, char *cmdString)
 {
         char delim[] = " ";
         char* token;
@@ -66,6 +66,8 @@ void parseCommand(struct commandObj* cmd, char *cmdString)
         }
         //End arguments array with NULL for execvp() detection
         cmd->arguments[i] = NULL;
+
+        return i;
 }
 
  /* Executes an external command with fork(), exec(), & wait() (phase 1)*/
@@ -75,8 +77,13 @@ void executeExternalProcess(char *cmdString)
         int childStatus;
         commandObj cmd;
 
-        parseCommand(&cmd, cmdString);
-       
+        //check number of arguments & run parse
+        if (parseCommand(&cmd, cmdString) > NUMARGS_MAX)
+        {
+                fprintf(stderr, "Error: too many process arguments\n");
+                return;
+        }
+
         //check if builtin command "cd" is called, utilizes parseCommand functionality
         if (!strcmp(cmd.program, "cd")) {
                 changeDirectory(cmd.arguments);
@@ -92,15 +99,11 @@ void executeExternalProcess(char *cmdString)
         //parent process should wait for child to execute
         else if (pid > 0) {
                 waitpid(pid, &childStatus, 0);
-                if (childStatus != 0)
-                {
-                        fprintf(stderr, "Error: command not found\n");
-                        childStatus = 1;
-                }
+                if(childStatus) fprintf(stderr, "Error: command not found\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, childStatus);
         }
         //fork() command failed
-        else fprintf(stderr, "error completing fork() [%d]\n", 1);
+        else exit(1);
 
         return;
 }
