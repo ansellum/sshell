@@ -15,7 +15,7 @@ typedef struct commandObj {
 }commandObj;
 
 /*Change directory*/
-void changeDirectory(char *commandArguments[]) 
+int changeDirectory(char *commandArguments[]) 
 {
         int status;
 
@@ -25,8 +25,7 @@ void changeDirectory(char *commandArguments[])
                 fprintf(stderr, "Error: cannot cd into directory\n");
                 status = 1;
         }
-        fprintf(stderr, "+ completed 'cd' [%d]\n", status);
-        return;
+        return status;
 }
 
 /*Print current working directory*/
@@ -36,7 +35,6 @@ void printWorkingDirectory()
 
         getcwd(cwd, sizeof(cwd));
         printf("%s\n", cwd);
-        fprintf(stderr, "+ completed 'pwd' [0]\n");
         return;
 }
 
@@ -86,7 +84,8 @@ void executeExternalProcess(char *cmdString)
 
         //check if builtin command "cd" is called, utilizes parseCommand functionality
         if (!strcmp(cmd.program, "cd")) {
-                changeDirectory(cmd.arguments);
+                int status = changeDirectory(cmd.arguments);
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
                 return;
         }
 
@@ -140,7 +139,10 @@ int main(void)
                 }
                 /* Builtin command "pwd"*/
                 else if (!strcmp(cmdString, "pwd"))
+                {
                         printWorkingDirectory();
+                        fprintf(stderr, "+ completed %s [0]\n", cmdString);
+                }
                 else executeExternalProcess(cmdString);
         }
        
