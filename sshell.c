@@ -47,23 +47,21 @@ int parseCommand(struct commandObj* cmd, char *cmdString)
         int i = 1;
 
         //make editable string from literal
-        char* buf = malloc(CMDLINE_MAX * sizeof(char));
-        strcpy(buf, cmdString);
+        char* command1 = malloc(CMDLINE_MAX * sizeof(char));
+        strcpy(command1, cmdString);
 
         //pass program name into command object
-        token = strsep(&buf, delim);
+        token = strsep(&command1, delim);
         cmd->program = token;
         cmd->arguments[0] = token;
 
-        printf("buf: %s\n", buf);
-
         //fill arguments array (program name is first in argument list; see execvp() man)
-        while ( buf != NULL && strlen(buf) != 0) {
+        while ( command1 != NULL && strlen(command1) != 0) {
                 //skip extra spaces
-                while (buf[0] == ' ') token = strsep(&buf, delim);
+                while (command1[0] == ' ') token = strsep(&command1, delim);
 
                 //update token
-                token = strsep(&buf, delim);
+                token = strsep(&command1, delim);
 
                 //pass command arguments
                 if (strlen(token) == 0) break;
