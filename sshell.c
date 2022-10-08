@@ -60,7 +60,6 @@ int parseCommand(struct commandObj* cmd, char *cmdString)
         //fill arguments array (program name is first in argument list; see execvp() man)
         while ( buf != NULL && strlen(buf) != 0) {
                 //skip extra spaces
-                printf("buf: %s\n", buf);
                 while (buf[0] == ' ') token = strsep(&buf, delim);
 
                 //update token
