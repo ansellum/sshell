@@ -17,7 +17,7 @@ typedef struct commandObj {
 void changeDirectory(char *commandArguments[]) 
 {
         chdir(commandArguments[1]);
-        printf("+ completed 'cd' [0]\n");
+        fprintf(stderr, "+ completed 'cd' [0]\n");
         return;
 }
 
@@ -28,7 +28,7 @@ void printWorkingDirectory()
 
         getcwd(cwd, sizeof(cwd));
         printf("%s\n", cwd);
-        printf("+ completed 'pwd' [0]\n");
+        fprintf(stderr, "+ completed 'pwd' [0]\n");
         return;
 }
 
@@ -84,7 +84,7 @@ void executeExternalProcess(char *cmdString)
         //parent process should wait for child to execute
         else if (pid > 0) {
                 waitpid(pid, &childStatus, 0);
-                printf("+ completed '%s' [%d]\n", cmdString, childStatus);
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, childStatus);
         }
         //fork() command failed
         else fprintf(stderr, "error completing fork() [%d]\n", 1);
