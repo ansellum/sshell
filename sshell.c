@@ -13,6 +13,7 @@
 typedef struct commandObj {
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
+        int redirectionCharacterDetected;
 }commandObj;
 
 /*Change directory*/
@@ -39,12 +40,37 @@ void printWorkingDirectory()
         return;
 }
 
+/*remove character from a string (outsourced)*/
+char* removeChar(char *str, char charToRemmove){
+    int i, j;
+    int len = strlen(str);
+    for(i=0; i<len; i++)
+    {
+        if(str[i] == charToRemmove)
+        {
+            for(j=i; j<len; j++)
+            {
+                str[j] = str[j+1];
+            }
+            len--;
+            i--;
+        }
+    }
+    return str;
+}
+
 /* Parses command into commandObj properties; returns number of arguments */
 int parseCommand(struct commandObj* cmd, char *cmdString)
 {
         char delim[] = " ";
+        char copyOfToken[ARGLENGTH_MAX];
         char* token;
+        char* lastArgument;
+        char* fileName;
         int i = 1;
+        int stopAddingTokens = 0;
+        int argumentCharacterCount = 0;
+        cmd->redirectionCharacterDetected = 0;
 
         //make editable string from literal
         char* command1 = malloc(CMDLINE_MAX * sizeof(char));
@@ -65,14 +91,71 @@ int parseCommand(struct commandObj* cmd, char *cmdString)
 
                 //pass command arguments
                 if (strlen(token) == 0) break;
-                cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
-                strcpy(cmd->arguments[i], token);
-
-                i++;
+                //check if current token is soley the meta character '>' (i.e. 'clean' spaces around '>')
+                else if (*token == '>' && strlen(token) == 1) {
+                    cmd->redirectionCharacterDetected = 1;
+                    continue;
+                }
+                //else check if current token contains the meta character '>' (i.e. no 'clean' spaces around '>')
+                else {
+                    //scan entire token
+                    for (int n = 0; n < strlen(token); n++) {
+                        //check if token contains '>'
+                        if (token[n] == '>') {
+                            cmd->redirectionCharacterDetected = 1;
+                            //now we need to find & remove '>' and add the token to the arguments array
+                            //case1: check if '>' is at the beggining of the string or at the end & remove it (i.e. '>file' or 'arg>')
+                            if (n == 0 || n == (strlen(token) - 1)) {
+                                token = removeChar(token, token[n]);
+                                break; //break from for loop & allow revised token to be added to argument array
+                            }
+                            //case2: now we know '>' must be in between the last argument and the file with no spaces around it (i.e. 'arg>file')
+                            else {
+                                //scan entire token
+                                for (int j = 0; j < strlen(token); j++) {
+                                    //continue adding one to 'argumentCharacterCount' to determine how long the 'arg' is before the '>' character
+                                    if (token[j] != '>') argumentCharacterCount++;
+                                    else break;
+                                }
+                                //add string before '>' to arguments array ('arg')
+                                cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
+                                //use 'argumentCharacterCount' to add the 'arg' to the arguments list
+                                strncat(cmd->arguments[i], token, argumentCharacterCount);
+                                i++; //next index for 'file' 
+                                
+                                //add string after '>' to arguments array ('file')
+                                strncpy(copyOfToken, token, strlen(token) + 1); //make a copy of 'char* token' into a 'char copyOfToken[]' in order for it to be manipulated
+                                cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
+                                //remove 'arg>' characters from 'arg>file' to be left with file name
+                                for (int q = 0; q < argumentCharacterCount + 1; q++) {
+                                    char* substr = copyOfToken + 1;
+                                    memmove(copyOfToken, substr, strlen(substr) + 1);
+                                }
+                                //add 'copyOfToken' (i.e. the name of the file) to the arguments array
+                                strcpy(cmd->arguments[i], copyOfToken);
+                                //signal to stop adding entries into arguments array bc 'file' will be the last entry with output redirection
+                                stopAddingTokens = 1;
+                                break;
+                            }
+                        }
+                        else continue;
+                    }
+                }
+                
+                if (stopAddingTokens == 0) {
+                    //continue adding to arguments[]
+                    cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
+                    strcpy(cmd->arguments[i], token);
+                    i++;
+                }
+                else {
+                    i++;
+                    break;
+                }
         }
         //End arguments array with NULL for execvp() detection
         cmd->arguments[i] = NULL;
-
+        
         return i;
 }
 
@@ -96,7 +179,14 @@ void executeExternalProcess(char *cmdString)
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
                 return;
         }
-
+        
+        /*check if meta character '>' is used, and execute redirection 
+        if (cmd.redirectionCharacterDetected == 1) {
+                //printf("%s\n", "Here");
+                //inputRedirection
+                //return;
+        }
+*/
         pid = fork();
         //child process should execute the command
         if (pid == 0) {
