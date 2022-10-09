@@ -9,11 +9,24 @@
 #define CMDLINE_MAX 512
 #define NUMARGS_MAX 16
 #define ARGLENGTH_MAX 32
+#define PIPES_MAX 4
 
 typedef struct commandObj {
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
+        int numArgs;
 }commandObj;
+
+void printCommands(struct commandObj* cmd, int index)
+{
+        for (int i = 0; i <= index; ++i)
+        {
+                printf("Program %d:\t%s\n", i, cmd[i].program);
+                printf("Arguments %d:\t", i);
+                for (int j = 1; j <= cmd[i].numArgs; ++j) printf("[%s] ", cmd[i].arguments[j]);
+                printf("\n");
+        }
+}
 
 /*Change directory*/
 int changeDirectory(char *commandArguments[]) 
@@ -39,60 +52,77 @@ void printWorkingDirectory()
         return;
 }
 
-/* Parses command into commandObj properties; returns number of arguments */
-int parseCommand(struct commandObj* cmd, char *cmdString)
+/* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
+int parseCommand(int* highestCMDIndex, struct commandObj* cmd, char* cmdString)
 {
         char delim[] = " ";
         char* token;
-        int i = 1;
+
+        const int index = *highestCMDIndex;
+        int argIndex = 1;
 
         //make editable string from literal
         char* command1 = malloc(CMDLINE_MAX * sizeof(char));
+        char* command2 = malloc(CMDLINE_MAX * sizeof(char));
         strcpy(command1, cmdString);
 
-        //pass program name into command object
-        token = strsep(&command1, delim);
-        cmd->program = token;
-        cmd->arguments[0] = token;
+        /*Recusively parse pipes*/
+        command2 = command1;
+        command1 = strsep(&command2, "|");
+        if (command2 != NULL) 
+        {
+                //CHECKPOINT: command1 = first command, command2 = rest of the cmdline
+                ++(*highestCMDIndex);
+                parseCommand(highestCMDIndex, cmd, command2);
+        }
 
-        //fill arguments array (program name is first in argument list; see execvp() man)
+        /*Define command struct properties*/
+        while (command1[0] == ' ') command1++;
+        token = strsep(&command1, delim);
+        cmd[index].program = token;
+        cmd[index].arguments[0] = token;
+        cmd[index].numArgs = 0;
+
+        //iterate through arguments
         while ( command1 != NULL && strlen(command1) != 0) {
+                /*Error checking*/
+                if (argIndex > NUMARGS_MAX) return -1;   //Too many arguments
+
                 //skip extra spaces
                 while (command1[0] == ' ') token = strsep(&command1, delim);
 
                 //update token
                 token = strsep(&command1, delim);
 
-                //pass command arguments
-                if (strlen(token) == 0) break;
-                cmd->arguments[i] = malloc(ARGLENGTH_MAX * sizeof(char));
-                strcpy(cmd->arguments[i], token);
 
-                i++;
+                //pass command arguments
+                cmd[index].arguments[argIndex] = malloc(ARGLENGTH_MAX * sizeof(char));
+                strcpy(cmd[index].arguments[argIndex], token);
+                cmd[index].numArgs = argIndex++;
         }
         //End arguments array with NULL for execvp() detection
-        cmd->arguments[i] = NULL;
+        cmd[index].arguments[argIndex] = NULL;
 
-        return i;
+        return 0;
 }
 
  /* Executes an external command with fork(), exec(), & wait() (phase 1)*/
 void executeExternalProcess(char *cmdString)
 {
-        int pid;
-        int childStatus;
-        commandObj cmd;
+        int pid, childStatus, highestCMDIndex = 0;
+        commandObj cmd[PIPES_MAX];
 
         //check number of arguments & run parse
-        if (parseCommand(&cmd, cmdString) > NUMARGS_MAX)
+        if (parseCommand(&highestCMDIndex, cmd, cmdString) < 0)
         {
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
         }
+        printCommands(cmd, highestCMDIndex);
 
         //check if builtin command "cd" is called, utilizes parseCommand functionality
-        if (!strcmp(cmd.program, "cd")) {
-                int status = changeDirectory(cmd.arguments);
+        if (!strcmp(cmd[0].program, "cd")) {
+                int status = changeDirectory(cmd[0].arguments);
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
                 return;
         }
@@ -100,7 +130,7 @@ void executeExternalProcess(char *cmdString)
         pid = fork();
         //child process should execute the command
         if (pid == 0) {
-                childStatus = execvp(cmd.program, cmd.arguments);
+                childStatus = execvp(cmd[0].program, cmd[0].arguments);
                 exit(1); //if child reaches this line it means there was an issue running exec command
         }
         //parent process should wait for child to execute
