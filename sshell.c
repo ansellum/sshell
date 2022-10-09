@@ -67,21 +67,17 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 
         /*Recusively parse pipes*/
         command2 = command1;
-        command1 = strsep(&command2, "|");
-        if (command2 != NULL) 
-        {
-                //CHECKPOINT: command1 = first command, command2 = rest of the cmdline
-                highestIndex = parseCommand(index + 1, cmd, command2);
-        }
+        command1 = strsep(&command2, "|"); //command1 = first command, command2 = rest of the cmdline
+        if (command2 != NULL) highestIndex = parseCommand(index + 1, cmd, command2);
 
-        /*Define command struct properties*/
+        /*Define command program*/
         while (command1[0] == ' ') command1++;
         token = strsep(&command1, delim);
         cmd[index].program = token;
         cmd[index].arguments[0] = token;
         cmd[index].numArgs = 0;
 
-        //iterate through arguments
+        //Iterate through arguments
         while ( command1 != NULL && strlen(command1) != 0) {
                 /*Error checking*/
                 if (argIndex > NUMARGS_MAX) return -1;   //Too many arguments
@@ -92,13 +88,12 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                 //update token
                 token = strsep(&command1, delim);
 
-
                 //pass command arguments
                 cmd[index].arguments[argIndex] = malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd[index].arguments[argIndex], token);
                 cmd[index].numArgs = argIndex++;
         }
-        //End arguments array with NULL for execvp() detection
+        //End arguments arr with NULL for execvp() detection
         cmd[index].arguments[argIndex] = NULL;
 
         return highestIndex;
