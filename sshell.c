@@ -46,13 +46,14 @@ int changeDirectory(char *commandArguments[])
 }
 
 /*Print current working directory*/
-void printWorkingDirectory() 
+int printWorkingDirectory() 
 {
+        int status;
         char cwd[CMDLINE_MAX];
 
-        getcwd(cwd, sizeof(cwd));
+        if (getcwd(cwd, sizeof(cwd)) == NULL) return 1;
         printf("%s\n", cwd);
-        return;
+        return 0;
 }
 
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
@@ -102,7 +103,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         return highestIndex;
 }
 
- /* Executes an external command with fork(), exec(), & wait() (phase 1)*/
+ /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
 void executeExternalProcess(char *cmdString)
 {
         int pid, childStatus, numObjects;
@@ -124,16 +125,16 @@ void executeExternalProcess(char *cmdString)
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
                 return;
         }
+        else if (!strcmp(cmd[0].program, "pwd"))
+        {
+                int status = printWorkingDirectory();
+                fprintf(stderr, "+ completed '%s' [0]\n", cmdString, status);
+                return;
+        }
         else if (!strcmp(cmd[0].program, "exit")) {
                 fprintf(stderr, "Bye...\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
                 exit(EXIT_SUCCESS);
-        }
-        else if (!strcmp(cmd[0].program, "pwd"))
-        {
-                printWorkingDirectory();
-                fprintf(stderr, "+ completed '%s' [0]\n", cmdString);
-                return;
         }
 
         pid = fork();
