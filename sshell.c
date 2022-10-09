@@ -15,6 +15,7 @@ typedef struct commandObj {
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
         int numArgs;
+        int order;
 }commandObj;
 
 /*Debug function*/
@@ -48,7 +49,6 @@ int changeDirectory(char *commandArguments[])
 /*Print current working directory*/
 int printWorkingDirectory() 
 {
-        int status;
         char cwd[CMDLINE_MAX];
 
         if (getcwd(cwd, sizeof(cwd)) == NULL) return 1;
@@ -61,7 +61,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 {
         char delim[] = " ";
         char* token;
-        int highestIndex = index;
+        int numPipes = index;
         int argIndex = 1;
 
         //make editable string from literal
@@ -72,16 +72,17 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         /*Recusively parse pipes*/
         command2 = command1;
         command1 = strsep(&command2, "|"); //command1 = first command, command2 = rest of the cmdline
-        if (command2 != NULL) highestIndex = parseCommand(index + 1, cmd, command2);
+        if(command2 != NULL) numPipes = parseCommand(index + 1, cmd, command2);
 
-        /*Define command program*/
+        /*Define command struct*/
         while (command1[0] == ' ') command1++;
         token = strsep(&command1, delim);
         cmd[index].program = token;
         cmd[index].arguments[0] = token;
         cmd[index].numArgs = 0;
+        cmd[index].order = index;
 
-        //Iterate through arguments
+        //iterate through arguments
         while ( command1 != NULL && strlen(command1) != 0) {
                 /*Error checking*/
                 if (argIndex >= NUMARGS_MAX) return -1;   //Too many arguments
@@ -100,58 +101,79 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         //End arguments arr with NULL for execvp() detection
         cmd[index].arguments[argIndex] = NULL;
 
-        return highestIndex;
+        return numPipes;
+}
+
+void executePipeline(int* fd[], struct commandObj* cmd, const int numPipes, const int index)
+{ 
+        int pid = fork();
+
+        if (pid == 0) { //Child process 
+                if (index != numPipes)  dup2(fd[index][1], STDOUT_FILENO);      //Last program: only redirect read
+                if (index != 0)         dup2(fd[index][0], STDIN_FILENO);       //First program: only redirect write
+
+                //close all pipes
+                for (i = 0; i < numPipes; ++i)
+                {
+                        close(fd[i][0]);
+                        close(fd[i][1]);
+                }
+                //execute program
+                execvp(cmd[index].program, cmd[index].arguments);
+        }
+        else if (pid > 0 && index < numPipes) executePipeline(fd, cmd, numPipes, index + 1);
 }
 
  /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
-void executeExternalProcess(char *cmdString)
+void prepareExternalProcess(char *cmdString)
 {
-        int pid, childStatus, numObjects;
+        int numPipes;
         commandObj cmd[PIPES_MAX];
 
         /*Parse and check for errors*/
-        numObjects = parseCommand(0, cmd, cmdString);
-        if (numObjects < 0)
+        numPipes = parseCommand(0, cmd, cmdString) + 1;
+        if (numPipes < 0)
         {
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
         }
+        /*Single Command*/
+        else if (numPipes == 0)
+        {
+                /* Builtin commands*/
+                if (!strcmp(cmd[0].program, "cd")) {
+                        int status = changeDirectory(cmd[0].arguments);
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
+                        return;
+                }
+                else if (!strcmp(cmd[0].program, "pwd"))
+                {
+                        int status = printWorkingDirectory();
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
+                        return;
+                }
+                else if (!strcmp(cmd[0].program, "exit")) {
+                        fprintf(stderr, "Bye...\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
+                        exit(EXIT_SUCCESS);
+                }
+
+                //need exec
+        }
+        /*Pipes*/
+        else
+        {
+                //create a R/W fd for each pipe
+                int fd[numPipes][2];
+                for (int i = 0; i < numPipes, ++i) {
+                        if (pipe(fd[i]) != 0)
+                                exit(EXIT_FAILURE);
+                }
+
+                executePipeline(fd, cmd, numPipes, i);
+        }
         //Debug command objects
         //printCommands(cmd, numObjects); 
-
-        /* Builtin commands*/
-        if (!strcmp(cmd[0].program, "cd")) {
-                int status = changeDirectory(cmd[0].arguments);
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
-                return;
-        }
-        else if (!strcmp(cmd[0].program, "pwd"))
-        {
-                int status = printWorkingDirectory();
-                fprintf(stderr, "+ completed '%s' [0]\n", cmdString, status);
-                return;
-        }
-        else if (!strcmp(cmd[0].program, "exit")) {
-                fprintf(stderr, "Bye...\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
-                exit(EXIT_SUCCESS);
-        }
-
-        pid = fork();
-        //child process should execute the command
-        if (pid == 0) {
-                childStatus = execvp(cmd[0].program, cmd[0].arguments);
-                exit(1); //if child reaches this line it means there was an issue running exec command
-        }
-        //parent process should wait for child to execute
-        else if (pid > 0) {
-                waitpid(pid, &childStatus, 0);
-                //Check if command ran successfully (assuming no wrong arguments, a failure = command not found)
-                if (childStatus) fprintf(stderr, "Error: command not found\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, childStatus);
-        }
-        //fork() command failed
-        else exit(EXIT_FAILURE);
 
         return;
 }
@@ -159,6 +181,7 @@ void executeExternalProcess(char *cmdString)
 int main(void)
 {
         char cmdString[CMDLINE_MAX];
+        int externalExit
 
         while (1) {
                 char *nl;
@@ -180,7 +203,7 @@ int main(void)
                 nl = strchr(cmdString, '\n');
                 if (nl) *nl = '\0';
 
-                executeExternalProcess(cmdString);
+                prepareExternalProcess(cmdString);
         }
        
         return EXIT_SUCCESS;
