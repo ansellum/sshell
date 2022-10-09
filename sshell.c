@@ -53,12 +53,11 @@ void printWorkingDirectory()
 }
 
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
-int parseCommand(int* highestCMDIndex, struct commandObj* cmd, char* cmdString)
+int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 {
         char delim[] = " ";
         char* token;
-
-        const int index = *highestCMDIndex;
+        int highestIndex = index;
         int argIndex = 1;
 
         //make editable string from literal
@@ -72,8 +71,7 @@ int parseCommand(int* highestCMDIndex, struct commandObj* cmd, char* cmdString)
         if (command2 != NULL) 
         {
                 //CHECKPOINT: command1 = first command, command2 = rest of the cmdline
-                ++(*highestCMDIndex);
-                parseCommand(highestCMDIndex, cmd, command2);
+                highestIndex = parseCommand(index + 1, cmd, command2);
         }
 
         /*Define command struct properties*/
@@ -103,23 +101,23 @@ int parseCommand(int* highestCMDIndex, struct commandObj* cmd, char* cmdString)
         //End arguments array with NULL for execvp() detection
         cmd[index].arguments[argIndex] = NULL;
 
-        return 0;
+        return highestIndex;
 }
 
  /* Executes an external command with fork(), exec(), & wait() (phase 1)*/
 void executeExternalProcess(char *cmdString)
 {
-        int pid, childStatus, highestCMDIndex = 0;
+        int pid, childStatus, numObjects;
         commandObj cmd[PIPES_MAX];
 
         //check number of arguments & run parse
-        if (parseCommand(&highestCMDIndex, cmd, cmdString) < 0)
+        numObjects = parseCommand(0, cmd, cmdString);
+        if (numObjects < 0)
         {
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
         }
-        printCommands(cmd, highestCMDIndex);
-
+        printCommands(cmd, numObjects);
         //check if builtin command "cd" is called, utilizes parseCommand functionality
         if (!strcmp(cmd[0].program, "cd")) {
                 int status = changeDirectory(cmd[0].arguments);
