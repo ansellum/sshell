@@ -17,15 +17,18 @@ typedef struct commandObj {
         int numArgs;
 }commandObj;
 
+/*Debug function*/
 void printCommands(struct commandObj* cmd, int index)
 {
+        printf("------------------------------\n");
         for (int i = 0; i <= index; ++i)
         {
-                printf("Program %d:\t%s\n", i, cmd[i].program);
-                printf("Arguments %d:\t", i);
+                printf("Program \t%d: %s\n", i, cmd[i].program);
+                printf("Arguments \t%d: ", i);
                 for (int j = 1; j <= cmd[i].numArgs; ++j) printf("[%s] ", cmd[i].arguments[j]);
                 printf("\n");
         }
+        printf("------------------------------\n\n");
 }
 
 /*Change directory*/
@@ -80,7 +83,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         //Iterate through arguments
         while ( command1 != NULL && strlen(command1) != 0) {
                 /*Error checking*/
-                if (argIndex > NUMARGS_MAX) return -1;   //Too many arguments
+                if (argIndex >= NUMARGS_MAX) return -1;   //Too many arguments
 
                 //skip extra spaces
                 while (command1[0] == ' ') token = strsep(&command1, delim);
@@ -105,18 +108,31 @@ void executeExternalProcess(char *cmdString)
         int pid, childStatus, numObjects;
         commandObj cmd[PIPES_MAX];
 
-        //check number of arguments & run parse
+        /*Parse and check for errors*/
         numObjects = parseCommand(0, cmd, cmdString);
         if (numObjects < 0)
         {
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
         }
-        printCommands(cmd, numObjects);
-        //check if builtin command "cd" is called, utilizes parseCommand functionality
+        //Debug command objects
+        //printCommands(cmd, numObjects); 
+
+        /* Builtin commands*/
         if (!strcmp(cmd[0].program, "cd")) {
                 int status = changeDirectory(cmd[0].arguments);
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
+                return;
+        }
+        else if (!strcmp(cmd[0].program, "exit")) {
+                fprintf(stderr, "Bye...\n");
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
+                exit(EXIT_SUCCESS);
+        }
+        else if (!strcmp(cmd[0].program, "pwd"))
+        {
+                printWorkingDirectory();
+                fprintf(stderr, "+ completed '%s' [0]\n", cmdString);
                 return;
         }
 
@@ -134,7 +150,7 @@ void executeExternalProcess(char *cmdString)
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, childStatus);
         }
         //fork() command failed
-        else exit(1);
+        else exit(EXIT_FAILURE);
 
         return;
 }
@@ -163,19 +179,7 @@ int main(void)
                 nl = strchr(cmdString, '\n');
                 if (nl) *nl = '\0';
 
-                /* Builtin command "exit"*/
-                if (!strcmp(cmdString, "exit")) {
-                        fprintf(stderr, "Bye...\n");
-                        fprintf(stderr, "+ completed '%s' [%d]\n",cmdString, 0);
-                        break;
-                }
-                /* Builtin command "pwd"*/
-                else if (!strcmp(cmdString, "pwd"))
-                {
-                        printWorkingDirectory();
-                        fprintf(stderr, "+ completed '%s' [0]\n", cmdString);
-                }
-                else executeExternalProcess(cmdString);
+                executeExternalProcess(cmdString);
         }
        
         return EXIT_SUCCESS;
