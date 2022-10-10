@@ -78,12 +78,13 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         //make editable string from literal
         char* command1 = malloc(CMDLINE_MAX * sizeof(char));
         char* command2 = malloc(CMDLINE_MAX * sizeof(char));
+        char* filename = malloc(ARGLENGTH_MAX * sizeof(char));
         strcpy(command1, cmdString);
 
         /*Parse output redirection symbol*/
-        command2 = command1;
-        command1 = strsep(&command2, ">"); //command1 = command, command2 = rest of the cmdline
-        if (command2 != NULL) cmd->redirectionCharacterDetected = 1;
+        filename = command1;
+        command1 = strsep(&filename, ">"); //command1 = command, command2 = rest of the cmdline
+        if (filename != NULL) cmd->redirectionCharacterDetected = 1;
 
         /*Recusively parse pipes*/
         command2 = command1;
@@ -166,6 +167,7 @@ void prepareExternalProcess(char *cmdString)
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
         }
+
         /*check if meta character '>' is used, and execute redirection
         if (cmd.redirectionCharacterDetected == 1) {
                 //printf("%s\n", "Here");
