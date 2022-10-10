@@ -127,10 +127,15 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
         int pid = fork();
 
         if (pid == 0) { //Child process 
-                if (index > 0)                  dup2(fd[index - 1][0], STDIN_FILENO);    //redirect stdin to read pipe,  unless it's the first command
-                if (index < numPipes)           dup2(fd[index][1], STDOUT_FILENO);       //redirect stdout to write pipe, unless it's the last command
-                else if (filename[0] != '\0');  //REDIRECT USING DUP2
-
+                if (index > 0)          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
+                if (index < numPipes)   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
+                                                                                //check if meta character '>' is used, and execute redirection
+                else if (cmd[index].redirectionCharacterDetected == 1)
+                {
+                        //printf("%s\n", "Here");
+                        //inputRedirection
+                        //return;
+                }
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -189,13 +194,6 @@ void prepareExternalProcess(char *cmdString)
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
                 exit(EXIT_SUCCESS);
         }
-
-        /*check if meta character '>' is used, and execute redirection
-        if (cmd.redirectionCharacterDetected == 1) {
-                //printf("%s\n", "Here");
-                //inputRedirection
-                //return;
-        }*/
 
         /*Piping (works with single commands)*/
         int fd[numPipes][2];
