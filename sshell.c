@@ -81,14 +81,18 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
         strcpy(command1, cmdString);
 
         /*Parse output redirection symbol*/
-        filename = command1;
-        command1 = strsep(&filename, ">"); //command1 = command, command2 = rest of the cmdline
-        if (filename != NULL) cmd->redirectionCharacterDetected = 1;
+        command2 = command1;
+        command1 = strsep(&command2, ">"); //command1 = before '>', command2 = after '>'
+        if (command2 != NULL)
+        {
+                *filename = command2;
+                while (*filename[0] == ' ') (*filename)++;
+        }
 
         /*Recusively parse pipes*/
         command2 = command1;
         command1 = strsep(&command2, "|"); //command1 = first command, command2 = rest of the cmdline
-        if(command2 != NULL) numPipes = parseCommand(index + 1, cmd, command2);
+        if(command2 != NULL) numPipes = parseCommand(index + 1, filename, cmd, command2);
 
         /*Define command struct*/
         while (command1[0] == ' ') command1++;
@@ -104,7 +108,7 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
                 if (argIndex >= NUMARGS_MAX) return -1;   //Too many arguments
 
                 //skip extra spaces
-                while (command1[0] == ' ') token = strsep(&command1, delim);
+                while (command1[0] == ' ') command1++;
 
                 //update token
                 token = strsep(&command1, delim);
@@ -127,12 +131,13 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
         int pid = fork();
 
         if (pid == 0) { //Child process 
+
                 if (index > 0)          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
                 if (index < numPipes)   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
-                else if (cmd[index].redirectionCharacterDetected == 1)          //check if meta character '>' is used, and execute redirection
+                else if (filename[0] != '\0')          //check if meta character '>' is used, and execute redirection
                 {
-                        //printf("%s\n", "Here");
-                        //inputRedirection
+                        fprintf(stdout, "%s\n", filename);
+                        //perform outputRedirection
                         //return;
                 }
 
@@ -146,7 +151,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
                 exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
         }
         else if (pid > 0) { //Parent process
-                if (index < numPipes) executePipeline(fd, exitval, cmd, numPipes, index + 1);
+                if (index < numPipes) executePipeline(fd, exitval, cmd, filename, numPipes, index + 1);
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -166,7 +171,10 @@ void prepareExternalProcess(char *cmdString)
         char* filename = malloc(ARGLENGTH_MAX * sizeof(char));
         commandObj cmd[PIPES_MAX];
 
+        if (strlen(cmdString) == 0) return;
+
         /*Parse and check for errors*/
+        filename[0] = '\0';     //For conditional in executePipeline
         numPipes = parseCommand(0, &filename, cmd, cmdString);
         if (numPipes < 0)
         {
