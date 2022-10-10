@@ -68,7 +68,7 @@ int printWorkingDirectory()
 }
 
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
-int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
+int parseCommand(const int index, char **filename, struct commandObj* cmd, char* cmdString)
 {
         char delim[] = " ";
         char* token;
@@ -78,7 +78,6 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         //make editable string from literal
         char* command1 = malloc(CMDLINE_MAX * sizeof(char));
         char* command2 = malloc(CMDLINE_MAX * sizeof(char));
-        char* filename = malloc(ARGLENGTH_MAX * sizeof(char));
         strcpy(command1, cmdString);
 
         /*Parse output redirection symbol*/
@@ -122,14 +121,16 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         return numPipes;
 }
 
-void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int numPipes, const int index)
+void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* filename, int numPipes, const int index)
 {
         int status;
         int pid = fork();
 
         if (pid == 0) { //Child process 
-                if (index < numPipes)  dup2(fd[index][1], STDOUT_FILENO);       //redirect write fd if not last
-                if (index > 0)         dup2(fd[index - 1][0], STDIN_FILENO);    //redirect read fd if not first
+                if (index > 0)                  dup2(fd[index - 1][0], STDIN_FILENO);    //redirect stdin to read pipe,  unless it's the first command
+                if (index < numPipes)           dup2(fd[index][1], STDOUT_FILENO);       //redirect stdout to write pipe, unless it's the last command
+                else if (filename[0] != '\0');  //REDIRECT USING DUP2
+
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -158,22 +159,16 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
 void prepareExternalProcess(char *cmdString)
 {
         int numPipes, status;
+        char* filename = malloc(ARGLENGTH_MAX * sizeof(char));
         commandObj cmd[PIPES_MAX];
 
         /*Parse and check for errors*/
-        numPipes = parseCommand(0, cmd, cmdString);
+        numPipes = parseCommand(0, &filename, cmd, cmdString);
         if (numPipes < 0)
         {
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
         }
-
-        /*check if meta character '>' is used, and execute redirection
-        if (cmd.redirectionCharacterDetected == 1) {
-                //printf("%s\n", "Here");
-                //inputRedirection
-                //return;
-        }*/
 
         /* Builtin commands*/
         if (!strcmp(cmd[0].program, "cd"))
@@ -195,6 +190,13 @@ void prepareExternalProcess(char *cmdString)
                 exit(EXIT_SUCCESS);
         }
 
+        /*check if meta character '>' is used, and execute redirection
+        if (cmd.redirectionCharacterDetected == 1) {
+                //printf("%s\n", "Here");
+                //inputRedirection
+                //return;
+        }*/
+
         /*Piping (works with single commands)*/
         int fd[numPipes][2];
         int exitval[numPipes + 1];
@@ -204,7 +206,7 @@ void prepareExternalProcess(char *cmdString)
                 if (pipe(fd[i]) != 0)
                         exit(EXIT_FAILURE);
         }
-        executePipeline(fd, exitval, cmd, numPipes, 0);
+        executePipeline(fd, exitval, cmd, filename, numPipes, 0);
      
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
