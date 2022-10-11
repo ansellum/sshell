@@ -95,7 +95,6 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
 {
         char delim[] = " ";
         char* token;
-        char** copyofFileName = filename;
         int numPipes = index;
         int argIndex = 1;
 
