@@ -20,30 +20,6 @@ typedef struct commandObj {
         int order;
 }commandObj;
 
-/*Debug function*/
-void printCommands(struct commandObj* cmd, int index)
-{
-        fprintf(stdout, "\n------------------------------\n");
-        for (int i = 0; i <= index; ++i)
-        {
-                fprintf(stdout, "Program \t%d: %s\n", i, cmd[i].program);
-                fprintf(stdout, "Arguments \t%d: ", i);
-                for (int j = 1; j <= cmd[i].numArgs; ++j) printf("[%s] ", cmd[i].arguments[j]);
-                fprintf(stdout, "\n");
-        }
-        fprintf(stdout, "------------------------------\n\n");
-}
-
-void printCommand(struct commandObj cmd)
-{
-        printf("------------------------------\n");
-        printf("Program \t: %s\n", cmd.program);
-        printf("Arguments \t: ");
-        for (int j = 1; j <= cmd.numArgs; ++j) printf("[%s] ", cmd.arguments[j]);
-        printf("\n");
-        printf("------------------------------\n\n");
-}
-
 /*Redirect output*/
 void redirectOutput(char *filename, int fd)
 {
@@ -76,6 +52,40 @@ int printWorkingDirectory()
         return 0;
 }
 
+void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* filename, int numPipes, const int index)
+{
+        int status;
+        int pid = fork();
+
+        if (pid == 0) { //Child process
+
+                if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
+                if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
+                else if (oRedirectSymbolDetected)       redirectOutput(filename, fd[index][1]);               //check if filename is detected, and execute redirection
+
+                //close all pipes
+                for (int i = 0; i < numPipes; ++i)
+                {
+                        close(fd[i][0]);
+                        close(fd[i][1]);
+                }
+                //execute program
+                exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
+        }
+        else if (pid > 0) { //Parent process
+                if (index < numPipes) executePipeline(fd, exitval, cmd, filename, numPipes, index + 1);
+
+                //close all pipes
+                for (int i = 0; i < numPipes; ++i)
+                {
+                        close(fd[i][0]);
+                        close(fd[i][1]);
+                }
+        }
+        waitpid(pid, &status, 0);
+        exitval[index] = WEXITSTATUS(status);
+}
+
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
 int parseCommand(const int index, char **filename, struct commandObj* cmd, char* cmdString)
 {
@@ -94,7 +104,6 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
         /*Parse output redirection symbol*/
         command2 = command1;
         command1 = strsep(&command2, ">"); //command1 = before '>', command2 = after '>'
-       
         if (command2 != NULL)
         {
                 oRedirectSymbolDetected = 1;
@@ -136,40 +145,6 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
         cmd[index].arguments[argIndex] = NULL;
 
         return numPipes;
-}
-
-void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* filename, int numPipes, const int index)
-{
-        int status;
-        int pid = fork();
-
-        if (pid == 0) { //Child process
-
-                if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
-                if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
-                else if (oRedirectSymbolDetected)       redirectOutput(filename, fd[index][1]);               //check if filename is detected, and execute redirection
-
-                //close all pipes
-                for (int i = 0; i < numPipes; ++i)
-                {
-                        close(fd[i][0]);
-                        close(fd[i][1]);
-                }
-                //execute program
-                exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
-        }
-        else if (pid > 0) { //Parent process
-                if (index < numPipes) executePipeline(fd, exitval, cmd, filename, numPipes, index + 1);
-
-                //close all pipes
-                for (int i = 0; i < numPipes; ++i)
-                {
-                        close(fd[i][0]);
-                        close(fd[i][1]);
-                }
-        }
-        waitpid(pid, &status, 0);
-        exitval[index] = WEXITSTATUS(status);
 }
 
 void builtin_commands(struct commandObj cmd, char* cmdString)
@@ -238,9 +213,6 @@ void prepareExternalProcess(char *cmdString)
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
         fprintf(stderr, "\n");
-
-        //Debug command objects
-        //printCommands(cmd, numPipes);
 
         return;
 }
