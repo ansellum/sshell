@@ -18,7 +18,6 @@ int oRedirectSymbolDetected = 0;
 typedef struct commandObj {
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
-        int redirectionCharacterDetected; //remove
         int numArgs;
         int order;
 }commandObj;
@@ -55,12 +54,12 @@ void redirectOutput(char *filename)
         //check if file exists & is allowed to be edited
         if(!access(filename, F_OK ) && !access(filename, W_OK))
         {
-            fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
-            if (fd == -1) return; //open() is unsuccessful
-            saved_stdout = dup(1);
-            dup2(fd, 1);
-            changed_stdout = 1;
-            close(fd);
+                fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
+                if (fd == -1) return; //open() is unsuccessful
+                saved_stdout = dup(1);
+                dup2(fd, 1);
+                changed_stdout = 1;
+                close(fd);
         }
         else fprintf(stderr, "Error: cannot open input file\n");
        
@@ -116,7 +115,7 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
                 *filename = command2;
                 while (*filename[0] == ' ') (*filename)++;
         }
-        //command contains '>' character & command 2 is NULL file name is empty
+        //command contains '>' character
         if (!(strchr(copyofCommand, '>') == NULL)) oRedirectSymbolDetected = 1;
        
         /*Recusively parse pipes*/
@@ -169,10 +168,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
                     redirectOutput(filename);
                 }
                 //'>' symbol used, but no fileName provided
-                else if (filename[0] == '\0' && oRedirectSymbolDetected)
-                {
-                fprintf(stderr, "Error: no input file\n");
-                }
+                else if (filename[0] == '\0' && oRedirectSymbolDetected) fprintf(stderr, "Error: no input file\n");
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -247,7 +243,7 @@ void prepareExternalProcess(char *cmdString)
         }
         executePipeline(fd, exitval, cmd, filename, numPipes, 0);
        
-        //restore stdout if changed
+        //restore detectors
         if (changed_stdout)
         {
                 dup2(saved_stdout, 1);
@@ -255,6 +251,7 @@ void prepareExternalProcess(char *cmdString)
                 changed_stdout = 0;
         }
         if (oRedirectSymbolDetected) oRedirectSymbolDetected = 0;
+
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
         fprintf(stderr, "\n");
