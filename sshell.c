@@ -11,9 +11,12 @@
 #define ARGLENGTH_MAX 32
 #define PIPES_MAX 4
 
-int saved_stdout;
+int duplicate_stdout;
+int duplicate_stdin;
 int changed_stdout = 0;
+int changed_stdin = 0;
 int oRedirectSymbolDetected = 0;
+int iRedirectSymbolDetected = 0;
 
 typedef struct commandObj {
         char* program;
@@ -46,22 +49,51 @@ void printCommand(struct commandObj cmd)
         printf("------------------------------\n\n");
 }
 
-/*Redirect output*/
-void redirectOutput(char *filename)
+/*Redirect output or input*/
+void redirectOutputOrInput(char *filename)
 {
         int fd;
-       
-        //check if file exists & is allowed to be edited
-        if(!access(filename, F_OK ) && !access(filename, W_OK))
+
+        //complete output redirection
+        if(oRedirectSymbolDetected)
         {
-                fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
-                if (fd == -1) return; //open() is unsuccessful
-                saved_stdout = dup(1);
-                dup2(fd, 1);
-                changed_stdout = 1;
-                close(fd);
+                //check if file exists & is allowed to be written to
+                if(!access(filename, F_OK ) && !access(filename, W_OK))
+                {
+                        fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents
+                        //open() is unsuccessful
+                        if (fd == -1)
+                        {
+                                fprintf(stderr, "Error: open() unsuccessful\n");
+                                return;
+                        }
+                        duplicate_stdout = dup(1);
+                        dup2(fd, 1);
+                        changed_stdout = 1;
+                        close(fd);
+                }
+                else fprintf(stderr, "Error: cannot open output file\n");
         }
-        else fprintf(stderr, "Error: cannot open input file\n");
+        //complete input redirection
+        else
+        {
+                //check if file exists & is allowed to be read
+                if(!access(filename, F_OK ) && !access(filename, R_OK))
+                {
+                        fd = open(filename, O_RDONLY); //open file as read
+                        //open() is unsuccessful
+                        if (fd == -1)
+                        {
+                                fprintf(stderr, "Error: open() unsuccessful\n");
+                                return;
+                        }
+                        duplicate_stdin = dup(0);
+                        dup2(fd, 0);
+                        changed_stdin = 1;
+                        close(fd);
+                }
+                else fprintf(stderr, "Error: cannot open input file\n");
+        }
        
         return;
 }
@@ -95,7 +127,6 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
 {
         char delim[] = " ";
         char* token;
-        char** copyofFileName = filename;
         int numPipes = index;
         int argIndex = 1;
 
@@ -109,14 +140,26 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
         /*Parse output redirection symbol*/
         command2 = command1;
         command1 = strsep(&command2, ">"); //command1 = before '>', command2 = after '>'
-       
+        //check file name isn't empty
         if (command2 != NULL)
         {
                 *filename = command2;
                 while (*filename[0] == ' ') (*filename)++;
         }
-        //command contains '>' character
+        //check if command contains '>' character
         if (!(strchr(copyofCommand, '>') == NULL)) oRedirectSymbolDetected = 1;
+
+        /*Parse input redirection symbol*/
+        command2 = command1;
+        command1 = strsep(&command2, "<"); //command1 = before '<', command2 = after '>'
+        //check if file name isn't empty
+        if (command2 != NULL)
+        {
+                *filename = command2;
+                while (*filename[0] == ' ') (*filename)++;
+        }
+        //check if command contains '<' character
+        if (!(strchr(copyofCommand, '<') == NULL)) iRedirectSymbolDetected = 1;
        
         /*Recusively parse pipes*/
         command2 = command1;
@@ -163,21 +206,22 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
 
                 if (index > 0)          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
                 if (index < numPipes)   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
-                else if (filename[0] != '\0')                                   //check if filename is detected, and execute redirection
+                else if (filename[0] != '\0') redirectOutputOrInput(filename);  //check if filename is detected, and execute redirection
+                //check if '>' or '<' symbol used (we already know file name is empty if we reach this point)
+                else if (oRedirectSymbolDetected || iRedirectSymbolDetected)
                 {
-                    redirectOutput(filename);
+                        if (oRedirectSymbolDetected) fprintf(stderr, "Error: no output file\n");
+                        else fprintf(stderr, "Error: no input file\n");
+                        exit(1); //can't execute command so exit
                 }
-                //'>' symbol used, but no fileName provided
-                else if (filename[0] == '\0' && oRedirectSymbolDetected) fprintf(stderr, "Error: no input file\n");
-
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
                 {
                         close(fd[i][0]);
                         close(fd[i][1]);
                 }
-                //execute program if we changed stdout successfully or a '>' isn't inputted
-                if (changed_stdout || (filename[0] == '\0' && !oRedirectSymbolDetected) || index < numPipes) exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
+                //make sure conditions are met before executing external command
+                if (changed_stdout || changed_stdin || index < numPipes || filename[0] == '\0') exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
                 else exit(1);
         }
         else if (pid > 0) { //Parent process
@@ -243,15 +287,24 @@ void prepareExternalProcess(char *cmdString)
         }
         executePipeline(fd, exitval, cmd, filename, numPipes, 0);
        
-        //restore detectors
+        //restore stdout & its detector if changed
         if (changed_stdout)
         {
-                dup2(saved_stdout, 1);
-                close(saved_stdout);
+                dup2(duplicate_stdout, 1);
+                close(duplicate_stdout);
                 changed_stdout = 0;
         }
+        //restore stdin & its detector if changed
+        else if (changed_stdin)
+        {
+                dup2(duplicate_stdin, 0);
+                close(duplicate_stdin);
+                changed_stdin = 0;
+        }
+        // restore output or input character detectors
         if (oRedirectSymbolDetected) oRedirectSymbolDetected = 0;
-
+        else if (iRedirectSymbolDetected) iRedirectSymbolDetected = 0;
+       
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
         fprintf(stderr, "\n");
