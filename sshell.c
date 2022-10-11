@@ -11,8 +11,6 @@
 #define ARGLENGTH_MAX 32
 #define PIPES_MAX 4
 
-int saved_stdout;
-int changed_stdout = 0;
 int oRedirectSymbolDetected = 0;
 
 typedef struct commandObj {
@@ -51,19 +49,10 @@ void redirectOutput(char *filename)
 {
         int fd;
        
-        //check if file exists & is allowed to be edited
-        if(!access(filename, F_OK ) && !access(filename, W_OK))
-        {
-                fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
-                if (fd == -1) return; //open() is unsuccessful
-                saved_stdout = dup(1);
-                dup2(fd, 1);
-                changed_stdout = 1;
-                close(fd);
-        }
-        else fprintf(stderr, "Error: cannot open input file\n");
-       
-        return;
+        fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
+        if (fd == -1) return; //open() is unsuccessful
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
 }
 
 /*Change directory*/
@@ -169,8 +158,8 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
                         close(fd[i][0]);
                         close(fd[i][1]);
                 }
-                //execute program if we changed stdout successfully or a '>' isn't inputted
-                if (changed_stdout || (filename[0] == '\0' && !oRedirectSymbolDetected) || index < numPipes) exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
+                //execute program if not last or if last and '<' detected
+                if ((oRedirectSymbolDetected && index == numPipes) || index < numPipes) exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
                 else exit(1);
         }
         else if (pid > 0) { //Parent process
@@ -248,13 +237,7 @@ void prepareExternalProcess(char *cmdString)
         executePipeline(fd, exitval, cmd, filename, numPipes, 0);
        
         //restore detectors
-        if (changed_stdout)
-        {
-                dup2(saved_stdout, 1);
-                close(saved_stdout);
-                changed_stdout = 0;
-        }
-        if (oRedirectSymbolDetected) oRedirectSymbolDetected = 0;
+        oRedirectSymbolDetected = 0;
 
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
