@@ -13,10 +13,12 @@
 
 int saved_stdout;
 int changed_stdout = 0;
+int oRedirectSymbolDetected = 0;
 
 typedef struct commandObj {
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
+        int redirectionCharacterDetected; //remove
         int numArgs;
         int order;
 }commandObj;
@@ -53,13 +55,14 @@ void redirectOutput(char *filename)
         //check if file exists & is allowed to be edited
         if(!access(filename, F_OK ) && !access(filename, W_OK))
         {
-                fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents
-                saved_stdout = dup(1); //save stdout fd so we can redirect it back to terminal later
-                dup2(fd, 1);
-                changed_stdout = 1;
-                close(fd); 
+            fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
+            if (fd == -1) return; //open() is unsuccessful
+            saved_stdout = dup(1);
+            dup2(fd, 1);
+            changed_stdout = 1;
+            close(fd);
         }
-        else fprintf(stderr, "Error accessing file: %s cannot be found or is not allowed to be modified\n", filename);
+        else fprintf(stderr, "Error: cannot open input file\n");
        
         return;
 }
@@ -93,23 +96,29 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
 {
         char delim[] = " ";
         char* token;
+        char** copyofFileName = filename;
         int numPipes = index;
         int argIndex = 1;
 
         //make editable string from literal
         char* command1 = malloc(CMDLINE_MAX * sizeof(char));
         char* command2 = malloc(CMDLINE_MAX * sizeof(char));
+        char* copyofCommand = malloc(CMDLINE_MAX * sizeof(char));
         strcpy(command1, cmdString);
-
+        strcpy(copyofCommand, cmdString);
+       
         /*Parse output redirection symbol*/
         command2 = command1;
         command1 = strsep(&command2, ">"); //command1 = before '>', command2 = after '>'
+       
         if (command2 != NULL)
         {
                 *filename = command2;
                 while (*filename[0] == ' ') (*filename)++;
         }
-
+        //command contains '>' character & command 2 is NULL file name is empty
+        if (!(strchr(copyofCommand, '>') == NULL)) oRedirectSymbolDetected = 1;
+       
         /*Recusively parse pipes*/
         command2 = command1;
         command1 = strsep(&command2, "|"); //command1 = first command, command2 = rest of the cmdline
@@ -155,7 +164,15 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
 
                 if (index > 0)          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
                 if (index < numPipes)   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
-                else if (filename[0] != '\0') redirectOutput(filename);         //if fileName has been detected, then execute redirection
+                else if (filename[0] != '\0')                                   //check if filename is detected, and execute redirection
+                {
+                    redirectOutput(filename);
+                }
+                //'>' symbol used, but no fileName provided
+                else if (filename[0] == '\0' && oRedirectSymbolDetected)
+                {
+                fprintf(stderr, "Error: no input file\n");
+                }
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -163,9 +180,8 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
                         close(fd[i][0]);
                         close(fd[i][1]);
                 }
-                //execute external program if we changed stdout successfully, we detected a filename or we haven't reached last pipe cmd
-                if (changed_stdout || filename[0] == '\0' || index < numPipes) exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
-                //if we reach here it means we detected a file name, but we don't want to execute redirection bc the file is invalid so exit child
+                //execute program if we changed stdout successfully or a '>' isn't inputted
+                if (changed_stdout || (filename[0] == '\0' && !oRedirectSymbolDetected) || index < numPipes) exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
                 else exit(1);
         }
         else if (pid > 0) { //Parent process
@@ -236,8 +252,9 @@ void prepareExternalProcess(char *cmdString)
         {
                 dup2(saved_stdout, 1);
                 close(saved_stdout);
-                changed_stdout = 0; //reset for future use
+                changed_stdout = 0;
         }
+        if (oRedirectSymbolDetected) oRedirectSymbolDetected = 0;
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
         fprintf(stderr, "\n");
