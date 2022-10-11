@@ -160,14 +160,9 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
 
         if (pid == 0) { //Child process
 
-                if (index > 0)          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
-                if (index < numPipes)   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
-                else if (filename[0] != '\0')                                   //check if filename is detected, and execute redirection
-                {
-                    redirectOutput(filename);
-                }
-                //'>' symbol used, but no fileName provided
-                else if (filename[0] == '\0' && oRedirectSymbolDetected) fprintf(stderr, "Error: no input file\n");
+                if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
+                if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
+                else if (oRedirectSymbolDetected)       redirectOutput(filename);               //check if filename is detected, and execute redirection
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -208,6 +203,11 @@ void prepareExternalProcess(char *cmdString)
         if (numPipes < 0)
         {
                 fprintf(stderr, "Error: too many process arguments\n");
+                return;
+        }
+        if (filename == NULL && oRedirectSymbolDetected)
+        {
+                fprintf(stderr, "Error: no output file\n");
                 return;
         }
 
