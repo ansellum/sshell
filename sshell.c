@@ -111,11 +111,10 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
        
         if (command2 != NULL)
         {
+                oRedirectSymbolDetected = 1;
                 *filename = command2;
                 while (*filename[0] == ' ') (*filename)++;
         }
-        //command contains '>' character
-        if (!(strchr(copyofCommand, '>') == NULL)) oRedirectSymbolDetected = 1;
        
         /*Recusively parse pipes*/
         command2 = command1;
