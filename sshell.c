@@ -17,7 +17,6 @@ typedef struct commandObj {
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
         int numArgs;
-        int order;
 }commandObj;
 
 /*Redirect output*/
@@ -122,7 +121,6 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
         cmd[index].program = token;
         cmd[index].arguments[0] = token;
         cmd[index].numArgs = 0;
-        cmd[index].order = index;
 
         //iterate through arguments
         while ( command1 != NULL && strlen(command1) != 0) {
