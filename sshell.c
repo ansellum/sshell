@@ -53,11 +53,11 @@ void redirectOutput(char *filename)
         //check if file exists & is allowed to be edited
         if(!access(filename, F_OK ) && !access(filename, W_OK))
         {
-            fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents
-            saved_stdout = dup(1); //save stdout fd so we can redirect it back to terminal later
-            dup2(fd, 1);
-            changed_stdout = 1; //true if we redirected stdout successfully
-            close(fd); 
+                fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents
+                saved_stdout = dup(1); //save stdout fd so we can redirect it back to terminal later
+                dup2(fd, 1);
+                changed_stdout = 1;
+                close(fd); 
         }
         else fprintf(stderr, "Error accessing file: %s cannot be found or is not allowed to be modified\n", filename);
        
