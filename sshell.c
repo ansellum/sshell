@@ -188,10 +188,33 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
         exitval[index] = WEXITSTATUS(status);
 }
 
+void builtin_commands(struct commandObj cmd, char* cmdString)
+{
+        int status;
+        if (!strcmp(cmd.program, "cd"))
+        {
+                status = changeDirectory(cmd.arguments);
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
+                return;
+        }
+        else if (!strcmp(cmd.program, "pwd"))
+        {
+                status = printWorkingDirectory();
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
+                return;
+        }
+        else if (!strcmp(cmd.program, "exit"))
+        {
+                fprintf(stderr, "Bye...\n");
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
+                exit(EXIT_SUCCESS);
+        }
+}
+
  /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
 void prepareExternalProcess(char *cmdString)
 {
-        int numPipes, status;
+        int numPipes;
         char* filename = malloc(ARGLENGTH_MAX * sizeof(char));
         commandObj cmd[PIPES_MAX];
 
@@ -212,24 +235,7 @@ void prepareExternalProcess(char *cmdString)
         }
 
         /* Builtin commands*/
-        if (!strcmp(cmd[0].program, "cd"))
-        {
-                status = changeDirectory(cmd[0].arguments);
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
-                return;
-        }
-        else if (!strcmp(cmd[0].program, "pwd"))
-        {
-                status = printWorkingDirectory();
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
-                return;
-        }
-        else if (!strcmp(cmd[0].program, "exit"))
-        {
-                fprintf(stderr, "Bye...\n");
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
-                exit(EXIT_SUCCESS);
-        }
+        builtin_commands(cmd[0], cmdString);
 
         /*Piping (works with single commands)*/
         int fd[numPipes][2];
