@@ -11,10 +11,12 @@
 #define ARGLENGTH_MAX 32
 #define PIPES_MAX 4
 
+int saved_stdout;
+int changed_stdout = 0;
+
 typedef struct commandObj {
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
-        int redirectionCharacterDetected;
         int numArgs;
         int order;
 }commandObj;
@@ -43,8 +45,27 @@ void printCommand(struct commandObj cmd)
         printf("------------------------------\n\n");
 }
 
+/*Redirect output*/
+void redirectOutput(char *filename)
+{
+        int fd;
+       
+        //check if file exists & is allowed to be edited
+        if(!access(filename, F_OK ) && !access(filename, W_OK))
+        {
+            fd = open(filename, O_WRONLY | O_TRUNC); //open file as write only & truncate contents
+            saved_stdout = dup(1); //save stdout fd so we can redirect it back to terminal later
+            dup2(fd, 1);
+            changed_stdout = 1; //true if we redirected stdout successfully
+            close(fd); 
+        }
+        else fprintf(stderr, "Error accessing file: %s cannot be found or is not allowed to be modified\n", filename);
+       
+        return;
+}
+
 /*Change directory*/
-int changeDirectory(char *commandArguments[]) 
+int changeDirectory(char *commandArguments[])
 {
         int status;
 
@@ -58,7 +79,7 @@ int changeDirectory(char *commandArguments[])
 }
 
 /*Print current working directory*/
-int printWorkingDirectory() 
+int printWorkingDirectory()
 {
         char cwd[CMDLINE_MAX];
 
@@ -130,16 +151,11 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
         int status;
         int pid = fork();
 
-        if (pid == 0) { //Child process 
+        if (pid == 0) { //Child process
 
                 if (index > 0)          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
                 if (index < numPipes)   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
-                else if (filename[0] != '\0')          //check if meta character '>' is used, and execute redirection
-                {
-                        fprintf(stdout, "%s\n", filename);
-                        //perform outputRedirection
-                        //return;
-                }
+                else if (filename[0] != '\0') redirectOutput(filename);         //if fileName has been detected, then execute redirection
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -147,8 +163,10 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
                         close(fd[i][0]);
                         close(fd[i][1]);
                 }
-                //execute program
-                exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
+                //execute external program if we changed stdout successfully, we detected a filename or we haven't reached last pipe cmd
+                if (changed_stdout || filename[0] == '\0' || index < numPipes) exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
+                //if we reach here it means we detected a file name, but we don't want to execute redirection bc the file is invalid so exit child
+                else exit(1);
         }
         else if (pid > 0) { //Parent process
                 if (index < numPipes) executePipeline(fd, exitval, cmd, filename, numPipes, index + 1);
@@ -212,13 +230,20 @@ void prepareExternalProcess(char *cmdString)
                         exit(EXIT_FAILURE);
         }
         executePipeline(fd, exitval, cmd, filename, numPipes, 0);
-     
+       
+        //restore stdout if changed
+        if (changed_stdout)
+        {
+                dup2(saved_stdout, 1);
+                close(saved_stdout);
+                changed_stdout = 0; //reset for future use
+        }
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
         fprintf(stderr, "\n");
 
         //Debug command objects
-        //printCommands(cmd, numObjects); 
+        //printCommands(cmd, numObjects);
 
         return;
 }
