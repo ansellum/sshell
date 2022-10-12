@@ -44,11 +44,6 @@ int changeDirectory(char *directory)
         int status;
 
         status = chdir(directory);
-        if (status)
-        {
-                fprintf(stderr, "Error: cannot cd into directory\n");
-                status = 1;
-        }
         return status;
 }
 
@@ -117,21 +112,24 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                 command1 = strsep(&command2, delims[i]);
 
                 if (command2 == NULL) continue; //Nothing Found
-                else if (strlen(command1) == 0 || (strlen(command2) == 0 && i == 2)) return -2; //Error: Missing command
+
+                if (strlen(command1) == 0 || (strlen(command2) == 0 && i == 2)) return -2; //Error: Missing command
 
                 switch (i) {
                 case 0: // < input redirection
-                        iRedirectSymbolDetected = 1;
+                        if (strlen(command2) == 0)              return -3; //Error: Missing command
+                        if (strchr(command2, '|') != NULL)      return -4; //Error: mislocated input redirection
 
-                        if (strlen(command2) == 0) return -3;
+                        iRedirectSymbolDetected = 1;
                         iFile = command2;
                         while (iFile[0] == ' ') iFile++;
                         break;
 
                 case 1: // > output redirection
-                        oRedirectSymbolDetected = 1;
+                        if (strlen(command2) == 0)              return -5;
+                        if (strchr(command2, '|') != NULL)      return -6; //Error: mislocated output redirection
 
-                        if (strlen(command2) == 0) return -3;
+                        oRedirectSymbolDetected = 1;
                         oFile = command2;
                         while (oFile[0] == ' ') oFile++;
                         break;
@@ -169,20 +167,25 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         return numPipes;
 }
 
-void builtin_commands(struct commandObj cmd, char* cmdString)
+int builtin_commands(struct commandObj cmd, char* cmdString)
 {
-        int status;
+        int status = 0;
         if (!strcmp(cmd.program, "cd"))
         {
                 status = changeDirectory(cmd.arguments[1]);
+                if (status)
+                {
+                        fprintf(stderr, "Error: cannot cd into directory\n");
+                        status = 1;
+                }
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
-                return;
+                return status;
         }
         else if (!strcmp(cmd.program, "pwd"))
         {
                 status = printWorkingDirectory();
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
-                return;
+                return status;
         }
         else if (!strcmp(cmd.program, "exit"))
         {
@@ -190,14 +193,7 @@ void builtin_commands(struct commandObj cmd, char* cmdString)
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
                 exit(EXIT_SUCCESS);
         }
-}
-
-void resetGlobal()
-{
-        oRedirectSymbolDetected = 0;
-        iRedirectSymbolDetected = 0;
-        oFile = "";
-        iFile = "";
+        return status;
 }
 
  /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
@@ -215,24 +211,33 @@ void prepareExternalProcess(char *cmdString)
 
         /*Post-parse error management*/
         switch (numPipes) {
-        case -1:
+        case -1: // ls 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
 
-        case -2:
+        case -2: // > file, | grep hi, ls |
                 fprintf(stderr, "Error: missing command\n");
                 return;
-        case -3:
-                char* error;
-                if (oRedirectSymbolDetected)    error = "output";
-                else                            error = "input";
-                resetGlobal();
-                fprintf(stderr, "Error: no %s file\n", error);
+
+        case -3: // sort <
+                fprintf(stderr, "Error: no input file\n");
+                return;
+
+        case -4: // < before |
+                fprintf(stderr, "Error: mislocated input redirection\n");
+                return;   
+
+        case -5: // echo >
+                fprintf(stderr, "Error: no output file\n");
+                return;
+
+        case -6: // > before |
+                fprintf(stderr, "Error: mislocated output redirection\n");
                 return;
         }      
 
         /* Builtin commands*/
-        builtin_commands(cmd[0], cmdString);
+        if (builtin_commands(cmd[0], cmdString)) return;
 
         /*Piping (works with single commands)*/
         int fd[numPipes][2];
@@ -244,7 +249,11 @@ void prepareExternalProcess(char *cmdString)
                         exit(EXIT_FAILURE);
         }
         executePipeline(fd, exitval, cmd, numPipes, 0);
-        resetGlobal();
+
+        oRedirectSymbolDetected = 0;
+        iRedirectSymbolDetected = 0;
+        oFile = "";
+        iFile = "";
 
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
