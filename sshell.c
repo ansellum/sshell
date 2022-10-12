@@ -26,15 +26,15 @@ typedef struct commandObj {
 /*Redirect*/
 void redirectOutput(int fd)
 {
-        fd = open(oFile, O_CREAT | O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
-        if (fd == -1) return; //open() is unsuccessful
+        fd = open(oFile, O_CREAT | O_WRONLY | O_TRUNC); //Create, write-only, truncate if exist
+        if (fd < 0) return; //open() is unsuccessful
         dup2(fd, STDOUT_FILENO);
 }
 
 void redirectInput(int fd)
 {
-        fd = open(iFile, O_RDONLY); //open file as read only
-        if (fd == -1) return; //open() is unsuccessful
+        fd = open(iFile, O_RDONLY); // read only
+        if (fd < 0) return; //open() is unsuccessful
         dup2(fd, STDIN_FILENO);
 }
 
@@ -117,16 +117,21 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                 command1 = strsep(&command2, delims[i]);
 
                 if (command2 == NULL) continue; //Nothing Found
+                else if (strlen(command1) == 0 || (strlen(command2) == 0 && i == 2)) return -2; //Error: Missing command
 
                 switch (i) {
                 case 0: // < input redirection
                         iRedirectSymbolDetected = 1;
+
+                        if (strlen(command2) == 0) return -3;
                         iFile = command2;
                         while (iFile[0] == ' ') iFile++;
                         break;
 
                 case 1: // > output redirection
                         oRedirectSymbolDetected = 1;
+
+                        if (strlen(command2) == 0) return -3;
                         oFile = command2;
                         while (oFile[0] == ' ') oFile++;
                         break;
@@ -146,12 +151,11 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 
         while ( command1 != NULL && strlen(command1) != 0) {
                 /*Error checking*/
-                if (argIndex >= NUMARGS_MAX) return -1;   //Too many arguments
+                if (argIndex >= NUMARGS_MAX) return -1;   //Error: Too many arguments
 
                 //skip extra spaces
                 while (command1[0] == ' ') command1++;
 
-                //update token
                 token = strsep(&command1, " ");
 
                 //pass command arguments
@@ -188,6 +192,14 @@ void builtin_commands(struct commandObj cmd, char* cmdString)
         }
 }
 
+void resetGlobal()
+{
+        oRedirectSymbolDetected = 0;
+        iRedirectSymbolDetected = 0;
+        oFile = "";
+        iFile = "";
+}
+
  /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
 void prepareExternalProcess(char *cmdString)
 {
@@ -202,21 +214,22 @@ void prepareExternalProcess(char *cmdString)
         numPipes = parseCommand(0, cmd, cmdString);
 
         /*Post-parse error management*/
-        if (numPipes < 0)
-        {
+        switch (numPipes) {
+        case -1:
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
-        }
-        if (strlen(oFile) == 0 && oRedirectSymbolDetected)
-        {
-                fprintf(stderr, "Error: no output file\n");
+
+        case -2:
+                fprintf(stderr, "Error: missing command\n");
                 return;
-        }
-        if (strlen(iFile) == 0 && iRedirectSymbolDetected)
-        {
-                fprintf(stderr, "Error: no input file\n");
+        case -3:
+                char* error;
+                if (oRedirectSymbolDetected)    error = "output";
+                else                            error = "input";
+                resetGlobal();
+                fprintf(stderr, "Error: no %s file\n", error);
                 return;
-        }
+        }      
 
         /* Builtin commands*/
         builtin_commands(cmd[0], cmdString);
@@ -231,12 +244,7 @@ void prepareExternalProcess(char *cmdString)
                         exit(EXIT_FAILURE);
         }
         executePipeline(fd, exitval, cmd, numPipes, 0);
-       
-        //restore global variables
-        oRedirectSymbolDetected = 0;
-        iRedirectSymbolDetected = 0;
-        oFile = "";
-        iFile = "";
+        resetGlobal();
 
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
