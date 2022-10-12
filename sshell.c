@@ -78,6 +78,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
                 }
                 //execute program
                 execvp(cmd[index].program, cmd[index].arguments);
+                if (errno = ENOENT) fprintf(stderr, "Error: command not found\n");
         }
         else if (pid > 0) { //Parent process
                 if (index < numPipes) executePipeline(fd, exitval, cmd, numPipes, index + 1);
@@ -90,7 +91,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
                 }
         }
         waitpid(pid, &status, 0);
-        exitval[index] = WEXITSTATUS(status);
+        if (WIFEXITED(status)) exitval[index] = WEXITSTATUS(status);
 }
 
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
@@ -113,12 +114,13 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 
                 if (command2 == NULL) continue; //Nothing Found
 
-                if (strlen(command1) == 0 || (strlen(command2) == 0 && i == 2)) return -2; //Error: Missing command
+                if (strlen(command1) == 0 || (strlen(command2) == 0 && i == 2)) return -1; //Error: Missing command
 
                 switch (i) {
                 case 0: // < input redirection
-                        if (strlen(command2) == 0)              return -3; //Error: Missing command
-                        if (strchr(command2, '|') != NULL)      return -4; //Error: mislocated input redirection
+                        if (strlen(command2) == 0)              return -2; //Error: no input file
+                        if (strchr(command2, '|') != NULL)      return -3; //Error: mislocated input redirection
+                        if (access(command2, R_OK) != 0)        return -4; //Error: cannot open input file
 
                         iRedirectSymbolDetected = 1;
                         iFile = command2;
@@ -126,8 +128,9 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                         break;
 
                 case 1: // > output redirection
-                        if (strlen(command2) == 0)              return -5;
+                        if (strlen(command2) == 0)              return -5; //Error: no output file
                         if (strchr(command2, '|') != NULL)      return -6; //Error: mislocated output redirection
+                        if (access(command2, W_OK) != 0)        return -7; //Error: cannot open output file
 
                         oRedirectSymbolDetected = 1;
                         oFile = command2;
@@ -143,21 +146,24 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         /*PARSE COMMAND PROPERTIES*/
         while (command1[0] == ' ') command1++;
         token = strsep(&command1, " ");
+
         cmd[index].program = token;
         cmd[index].arguments[0] = token;
         cmd[index].numArgs = 0;
 
         while ( command1 != NULL && strlen(command1) != 0) {
-                /*Error checking*/
-                if (argIndex >= NUMARGS_MAX) return -1;   //Error: Too many arguments
+                //Pre-token error processing
+                if (argIndex >= NUMARGS_MAX) return -8;   //Error: Too many arguments
 
                 //skip extra spaces
                 while (command1[0] == ' ') command1++;
 
                 token = strsep(&command1, " ");
 
-                //pass command arguments
+                //Post-token error checking
                 if (strlen(token) == 0) break;
+
+                //pass command arguments
                 cmd[index].arguments[argIndex] = malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd[index].arguments[argIndex], token);
                 cmd[index].numArgs = argIndex++;
@@ -211,21 +217,21 @@ void prepareExternalProcess(char *cmdString)
 
         /*Post-parse error management*/
         switch (numPipes) {
-        case -1: // ls 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
-                fprintf(stderr, "Error: too many process arguments\n");
-                return;
-
-        case -2: // > file, | grep hi, ls |
+        case -1: // > file 
                 fprintf(stderr, "Error: missing command\n");
                 return;
 
-        case -3: // sort <
+        case -2: // sort <
                 fprintf(stderr, "Error: no input file\n");
                 return;
 
-        case -4: // < before |
+        case -3: // < before |
                 fprintf(stderr, "Error: mislocated input redirection\n");
                 return;   
+
+        case -4: 
+                fprintf(stderr, "Error: cannot open input file \n");
+                return;
 
         case -5: // echo >
                 fprintf(stderr, "Error: no output file\n");
@@ -233,6 +239,14 @@ void prepareExternalProcess(char *cmdString)
 
         case -6: // > before |
                 fprintf(stderr, "Error: mislocated output redirection\n");
+                return;
+
+        case -7:
+                fprintf(stderr, "Error: cannot open output file \n");
+                return;
+
+        case -8: // $ ls 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+                fprintf(stderr, "Error: too many process arguments\n");
                 return;
         }      
 
@@ -256,7 +270,10 @@ void prepareExternalProcess(char *cmdString)
         iFile = "";
 
         fprintf(stderr, "+ completed '%s' ", cmdString);
-        for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
+        for (int i = 0; i < numPipes + 1; ++i)
+        {
+                fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
+        }
         fprintf(stderr, "\n");
 
         return;
