@@ -116,7 +116,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                 command2 = command1;
                 command1 = strsep(&command2, delims[i]);
 
-                if (command2 == NULL) break; //Nothing Found
+                if (command2 == NULL) continue; //Nothing Found
 
                 switch (i) {
                 case 0: // < input redirection
