@@ -38,11 +38,11 @@ void redirectInput(int fd)
 }
 
 /*Change directory*/
-int changeDirectory(char *commandArguments[])
+int changeDirectory(char *directory)
 {
         int status;
 
-        status = chdir(commandArguments[1]);
+        status = chdir(directory);
         if (status)
         {
                 fprintf(stderr, "Error: cannot cd into directory\n");
@@ -169,7 +169,7 @@ void builtin_commands(struct commandObj cmd, char* cmdString)
         int status;
         if (!strcmp(cmd.program, "cd"))
         {
-                status = changeDirectory(cmd.arguments);
+                status = changeDirectory(cmd.arguments[1]);
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
                 return;
         }
