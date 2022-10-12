@@ -101,52 +101,49 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
 int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 {
-        char* token;
-        int numPipes = index;
         int argIndex = 1;
-
-        //make editable string from literal
+        int numPipes = index;
         char* command1 = malloc(CMDLINE_MAX * sizeof(char));
         char* command2 = malloc(CMDLINE_MAX * sizeof(char));
+        char* delims[NUM_DELIMS] = { "<" , ">" , "|" };
+        char* token;
+
         strcpy(command1, cmdString);
        
-        int delims[NUM_DELIMS] = { '<', '>', '|' };
-
-        /*Parse output redirection symbol*/
+        /*PARSE DELIMITERS*/
         for (int i = 0; i < NUM_DELIMS; ++i)
         {
                 command2 = command1;
-                command1 = strsep(&command2, delims[i] + "");
+                command1 = strsep(&command2, delims[i]);
 
-                if (command2 == NULL) break;    //Nothing Found
+                if (command2 == NULL) break; //Nothing Found
 
-                switch (delims[i]) {
-                case '<':
+                switch (i) {
+                case 0: // < input redirection
                         iRedirectSymbolDetected = 1;
                         iFile = command2;
                         while (iFile[0] == ' ') iFile++;
                         break;
 
-                case '>':
+                case 1: // > output redirection
                         oRedirectSymbolDetected = 1;
                         oFile = command2;
                         while (oFile[0] == ' ') oFile++;
                         break;
 
-                case '|':
+                case 2: // | piping
                         numPipes = parseCommand(index + 1, cmd, command2);
                         break;
                 }
         }
 
-        /*Define command struct*/
+        /*PARSE COMMAND PROPERTIES*/
         while (command1[0] == ' ') command1++;
         token = strsep(&command1, " ");
         cmd[index].program = token;
         cmd[index].arguments[0] = token;
         cmd[index].numArgs = 0;
 
-        //iterate through arguments
         while ( command1 != NULL && strlen(command1) != 0) {
                 /*Error checking*/
                 if (argIndex >= NUMARGS_MAX) return -1;   //Too many arguments
@@ -163,9 +160,8 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                 strcpy(cmd[index].arguments[argIndex], token);
                 cmd[index].numArgs = argIndex++;
         }
-        //End arguments arr with NULL for execvp() detection
-        cmd[index].arguments[argIndex] = NULL;
-
+        cmd[index].arguments[argIndex] = NULL; //execvp()
+        
         return numPipes;
 }
 
