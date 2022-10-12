@@ -5,4 +5,4 @@ sshell: sshell.c
 	$(CC) $(CFLAGS) -o sshell sshell.c
 
 clean:
-	rm -rf sshell
+	rm -rf sshell *.txt

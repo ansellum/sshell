@@ -1,2 +1,4 @@
 sshell
 *.bak
+*.txt
+.vs

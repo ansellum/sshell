@@ -10,44 +10,40 @@
 #define NUMARGS_MAX 16
 #define ARGLENGTH_MAX 32
 #define PIPES_MAX 4
+#define NUM_DELIMS 3
+
+int oRedirectSymbolDetected = 0;
+int iRedirectSymbolDetected = 0;
+char* oFile = "";
+char* iFile = "";
 
 typedef struct commandObj {
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
         int numArgs;
-        int order;
 }commandObj;
 
-/*Debug function*/
-void printCommands(struct commandObj* cmd, int index)
+/*Redirect*/
+void redirectOutput(int fd)
 {
-        fprintf(stdout, "\n------------------------------\n");
-        for (int i = 0; i <= index; ++i)
-        {
-                fprintf(stdout, "Program \t%d: %s\n", i, cmd[i].program);
-                fprintf(stdout, "Arguments \t%d: ", i);
-                for (int j = 1; j <= cmd[i].numArgs; ++j) printf("[%s] ", cmd[i].arguments[j]);
-                fprintf(stdout, "\n");
-        }
-        fprintf(stdout, "------------------------------\n\n");
+        fd = open(oFile, O_CREAT | O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
+        if (fd == -1) return; //open() is unsuccessful
+        dup2(fd, STDOUT_FILENO);
 }
 
-void printCommand(struct commandObj cmd)
+void redirectInput(int fd)
 {
-        printf("------------------------------\n");
-        printf("Program \t: %s\n", cmd.program);
-        printf("Arguments \t: ");
-        for (int j = 1; j <= cmd.numArgs; ++j) printf("[%s] ", cmd.arguments[j]);
-        printf("\n");
-        printf("------------------------------\n\n");
+        fd = open(iFile, O_RDONLY); //open file as read only
+        if (fd == -1) return; //open() is unsuccessful
+        dup2(fd, STDIN_FILENO);
 }
 
 /*Change directory*/
-int changeDirectory(char *commandArguments[]) 
+int changeDirectory(char *directory)
 {
         int status;
 
-        status = chdir(commandArguments[1]);
+        status = chdir(directory);
         if (status)
         {
                 fprintf(stderr, "Error: cannot cd into directory\n");
@@ -57,7 +53,7 @@ int changeDirectory(char *commandArguments[])
 }
 
 /*Print current working directory*/
-int printWorkingDirectory() 
+int printWorkingDirectory()
 {
         char cwd[CMDLINE_MAX];
 
@@ -66,62 +62,18 @@ int printWorkingDirectory()
         return 0;
 }
 
-/* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
-int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
-{
-        char delim[] = " ";
-        char* token;
-        int numPipes = index;
-        int argIndex = 1;
-
-        //make editable string from literal
-        char* command1 = malloc(CMDLINE_MAX * sizeof(char));
-        char* command2 = malloc(CMDLINE_MAX * sizeof(char));
-        strcpy(command1, cmdString);
-
-        /*Recusively parse pipes*/
-        command2 = command1;
-        command1 = strsep(&command2, "|"); //command1 = first command, command2 = rest of the cmdline
-        if(command2 != NULL) numPipes = parseCommand(index + 1, cmd, command2);
-
-        /*Define command struct*/
-        while (command1[0] == ' ') command1++;
-        token = strsep(&command1, delim);
-        cmd[index].program = token;
-        cmd[index].arguments[0] = token;
-        cmd[index].numArgs = 0;
-        cmd[index].order = index;
-
-        //iterate through arguments
-        while ( command1 != NULL && strlen(command1) != 0) {
-                /*Error checking*/
-                if (argIndex >= NUMARGS_MAX) return -1;   //Too many arguments
-
-                //skip extra spaces
-                while (command1[0] == ' ') token = strsep(&command1, delim);
-
-                //update token
-                token = strsep(&command1, delim);
-
-                //pass command arguments
-                cmd[index].arguments[argIndex] = malloc(ARGLENGTH_MAX * sizeof(char));
-                strcpy(cmd[index].arguments[argIndex], token);
-                cmd[index].numArgs = argIndex++;
-        }
-        //End arguments arr with NULL for execvp() detection
-        cmd[index].arguments[argIndex] = NULL;
-
-        return numPipes;
-}
-
 void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int numPipes, const int index)
 {
         int status;
         int pid = fork();
 
-        if (pid == 0) { //Child process 
-                if (index < numPipes)  dup2(fd[index][1], STDOUT_FILENO);       //redirect write fd if not last
-                if (index > 0)         dup2(fd[index - 1][0], STDIN_FILENO);    //redirect read fd if not first
+        if (pid == 0) { //Child process
+
+                if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
+                else if (iRedirectSymbolDetected)       redirectInput(fd[index][0]);
+
+                if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
+                else if (oRedirectSymbolDetected)       redirectOutput(fd[index][1]);               //check if filename is detected, and execute redirection
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -130,7 +82,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
                         close(fd[i][1]);
                 }
                 //execute program
-                exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
+                execvp(cmd[index].program, cmd[index].arguments);
         }
         else if (pid > 0) { //Parent process
                 if (index < numPipes) executePipeline(fd, exitval, cmd, numPipes, index + 1);
@@ -146,39 +98,128 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
         exitval[index] = WEXITSTATUS(status);
 }
 
- /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
-void prepareExternalProcess(char *cmdString)
+/* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
+int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 {
-        int numPipes, status;
-        commandObj cmd[PIPES_MAX];
+        int argIndex = 1;
+        int numPipes = index;
+        char* command1 = malloc(CMDLINE_MAX * sizeof(char));
+        char* command2 = malloc(CMDLINE_MAX * sizeof(char));
+        char* delims[NUM_DELIMS] = { "<" , ">" , "|" };
+        char* token;
 
-        /*Parse and check for errors*/
-        numPipes = parseCommand(0, cmd, cmdString);
-        if (numPipes < 0)
+        strcpy(command1, cmdString);
+       
+        /*PARSE DELIMITERS*/
+        for (int i = 0; i < NUM_DELIMS; ++i)
         {
-                fprintf(stderr, "Error: too many process arguments\n");
-                return;
+                command2 = command1;
+                command1 = strsep(&command2, delims[i]);
+
+                if (command2 == NULL) continue; //Nothing Found
+
+                switch (i) {
+                case 0: // < input redirection
+                        iRedirectSymbolDetected = 1;
+                        iFile = command2;
+                        while (iFile[0] == ' ') iFile++;
+                        break;
+
+                case 1: // > output redirection
+                        oRedirectSymbolDetected = 1;
+                        oFile = command2;
+                        while (oFile[0] == ' ') oFile++;
+                        break;
+
+                case 2: // | piping
+                        numPipes = parseCommand(index + 1, cmd, command2);
+                        break;
+                }
         }
 
-        /* Builtin commands*/
-        if (!strcmp(cmd[0].program, "cd"))
+        /*PARSE COMMAND PROPERTIES*/
+        while (command1[0] == ' ') command1++;
+        token = strsep(&command1, " ");
+        cmd[index].program = token;
+        cmd[index].arguments[0] = token;
+        cmd[index].numArgs = 0;
+
+        while ( command1 != NULL && strlen(command1) != 0) {
+                /*Error checking*/
+                if (argIndex >= NUMARGS_MAX) return -1;   //Too many arguments
+
+                //skip extra spaces
+                while (command1[0] == ' ') command1++;
+
+                //update token
+                token = strsep(&command1, " ");
+
+                //pass command arguments
+                if (strlen(token) == 0) break;
+                cmd[index].arguments[argIndex] = malloc(ARGLENGTH_MAX * sizeof(char));
+                strcpy(cmd[index].arguments[argIndex], token);
+                cmd[index].numArgs = argIndex++;
+        }
+        cmd[index].arguments[argIndex] = NULL; //execvp()
+        
+        return numPipes;
+}
+
+void builtin_commands(struct commandObj cmd, char* cmdString)
+{
+        int status;
+        if (!strcmp(cmd.program, "cd"))
         {
-                status = changeDirectory(cmd[0].arguments);
+                status = changeDirectory(cmd.arguments[1]);
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
                 return;
         }
-        else if (!strcmp(cmd[0].program, "pwd"))
+        else if (!strcmp(cmd.program, "pwd"))
         {
                 status = printWorkingDirectory();
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
                 return;
         }
-        else if (!strcmp(cmd[0].program, "exit"))
+        else if (!strcmp(cmd.program, "exit"))
         {
                 fprintf(stderr, "Bye...\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
                 exit(EXIT_SUCCESS);
         }
+}
+
+ /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
+void prepareExternalProcess(char *cmdString)
+{
+        int numPipes;
+        oFile = malloc(ARGLENGTH_MAX * sizeof(char));
+        iFile = malloc(ARGLENGTH_MAX * sizeof(char));
+        commandObj cmd[PIPES_MAX];
+
+        if (strlen(cmdString) == 0) return;
+
+        /*Parse*/
+        numPipes = parseCommand(0, cmd, cmdString);
+
+        /*Post-parse error management*/
+        if (numPipes < 0)
+        {
+                fprintf(stderr, "Error: too many process arguments\n");
+                return;
+        }
+        if (strlen(oFile) == 0 && oRedirectSymbolDetected)
+        {
+                fprintf(stderr, "Error: no output file\n");
+                return;
+        }
+        if (strlen(iFile) == 0 && iRedirectSymbolDetected)
+        {
+                fprintf(stderr, "Error: no input file\n");
+                return;
+        }
+
+        /* Builtin commands*/
+        builtin_commands(cmd[0], cmdString);
 
         /*Piping (works with single commands)*/
         int fd[numPipes][2];
@@ -190,12 +231,16 @@ void prepareExternalProcess(char *cmdString)
                         exit(EXIT_FAILURE);
         }
         executePipeline(fd, exitval, cmd, numPipes, 0);
-     
+       
+        //restore global variables
+        oRedirectSymbolDetected = 0;
+        iRedirectSymbolDetected = 0;
+        oFile = "";
+        iFile = "";
+
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
         fprintf(stderr, "\n");
-        //Debug command objects
-        //printCommands(cmd, numObjects); 
 
         return;
 }
