@@ -12,7 +12,9 @@
 #define PIPES_MAX 4
 
 int oRedirectSymbolDetected = 0;
+int iRedirectSymbolDetected = 0;
 char* oFile;
+char* iFile;
 
 typedef struct commandObj {
         char* program;
@@ -26,6 +28,13 @@ void redirectOutput(int fd)
         fd = open(oFile, O_CREAT | O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
         if (fd == -1) return; //open() is unsuccessful
         dup2(fd, STDOUT_FILENO);
+}
+
+void redirectInput(int fd)
+{
+        fd = open(iFile, O_RDONLY); //open file as read only
+        if (fd == -1) return; //open() is unsuccessful
+        dup2(fd, STDIN_FILENO);
 }
 
 /*Change directory*/
@@ -60,6 +69,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
         if (pid == 0) { //Child process
 
                 if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
+                else if (iRedirectSymbolDetected)       redirectInput(fd[index][0]);
                 if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
                 else if (oRedirectSymbolDetected)       redirectOutput(fd[index][1]);               //check if filename is detected, and execute redirection
 
@@ -97,10 +107,18 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         //make editable string from literal
         char* command1 = malloc(CMDLINE_MAX * sizeof(char));
         char* command2 = malloc(CMDLINE_MAX * sizeof(char));
-        char* copyofCommand = malloc(CMDLINE_MAX * sizeof(char));
         strcpy(command1, cmdString);
-        strcpy(copyofCommand, cmdString);
        
+        /*Parse output redirection symbol*/
+        command2 = command1;
+        command1 = strsep(&command2, "<"); //command1 = before '>', command2 = after '>'
+        if (command2 != NULL)
+        {
+                iRedirectSymbolDetected = 1;
+                iFile = command2;
+                while (iFile[0] == ' ') iFile++;
+        }
+
         /*Parse output redirection symbol*/
         command2 = command1;
         command1 = strsep(&command2, ">"); //command1 = before '>', command2 = after '>'
@@ -208,6 +226,7 @@ void prepareExternalProcess(char *cmdString)
        
         //restore detectors
         oRedirectSymbolDetected = 0;
+        iRedirectSymbolDetected = 0;
 
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
