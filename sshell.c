@@ -13,8 +13,8 @@
 
 int oRedirectSymbolDetected = 0;
 int iRedirectSymbolDetected = 0;
-char* oFile;
-char* iFile;
+char* oFile = "";
+char* iFile = "";
 
 typedef struct commandObj {
         char* program;
@@ -111,7 +111,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
        
         /*Parse output redirection symbol*/
         command2 = command1;
-        command1 = strsep(&command2, "<"); //command1 = before '>', command2 = after '>'
+        command1 = strsep(&command2, "<"); //command1 = before '<', command2 = after '<'
         if (command2 != NULL)
         {
                 iRedirectSymbolDetected = 1;
@@ -192,12 +192,12 @@ void prepareExternalProcess(char *cmdString)
 {
         int numPipes;
         oFile = malloc(ARGLENGTH_MAX * sizeof(char));
+        iFile = malloc(ARGLENGTH_MAX * sizeof(char));
         commandObj cmd[PIPES_MAX];
 
         if (strlen(cmdString) == 0) return;
 
         /*Parse and check for errors*/
-        oFile[0] = '\0';     //For conditional in executePipeline
         numPipes = parseCommand(0, cmd, cmdString);
         if (numPipes < 0)
         {
@@ -232,6 +232,8 @@ void prepareExternalProcess(char *cmdString)
         //restore detectors
         oRedirectSymbolDetected = 0;
         iRedirectSymbolDetected = 0;
+        oFile = "";
+        iFile = "";
 
         fprintf(stderr, "+ completed '%s' ", cmdString);
         for (int i = 0; i < numPipes + 1; ++i) fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
