@@ -22,7 +22,7 @@ typedef struct commandObj {
         int numArgs;
 }commandObj;
 
-/*Redirect output*/
+/*Redirect*/
 void redirectOutput(int fd)
 {
         fd = open(oFile, O_CREAT | O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
@@ -207,6 +207,11 @@ void prepareExternalProcess(char *cmdString)
         if (strlen(oFile) == 0 && oRedirectSymbolDetected)
         {
                 fprintf(stderr, "Error: no output file\n");
+                return;
+        }
+        if (strlen(iFile) == 0 && iRedirectSymbolDetected)
+        {
+                fprintf(stderr, "Error: no input file\n");
                 return;
         }
 
