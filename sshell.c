@@ -12,6 +12,7 @@
 #define PIPES_MAX 4
 
 int oRedirectSymbolDetected = 0;
+char* oFile;
 
 typedef struct commandObj {
         char* program;
@@ -20,9 +21,9 @@ typedef struct commandObj {
 }commandObj;
 
 /*Redirect output*/
-void redirectOutput(char *filename, int fd)
+void redirectOutput(int fd)
 {
-        fd = open(filename, O_CREAT | O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
+        fd = open(oFile, O_CREAT | O_WRONLY | O_TRUNC); //open file as write only & truncate contents if it's
         if (fd == -1) return; //open() is unsuccessful
         dup2(fd, STDOUT_FILENO);
 }
@@ -51,7 +52,7 @@ int printWorkingDirectory()
         return 0;
 }
 
-void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* filename, int numPipes, const int index)
+void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int numPipes, const int index)
 {
         int status;
         int pid = fork();
@@ -60,7 +61,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
 
                 if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
                 if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
-                else if (oRedirectSymbolDetected)       redirectOutput(filename, fd[index][1]);               //check if filename is detected, and execute redirection
+                else if (oRedirectSymbolDetected)       redirectOutput(fd[index][1]);               //check if filename is detected, and execute redirection
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -72,7 +73,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
                 exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
         }
         else if (pid > 0) { //Parent process
-                if (index < numPipes) executePipeline(fd, exitval, cmd, filename, numPipes, index + 1);
+                if (index < numPipes) executePipeline(fd, exitval, cmd, numPipes, index + 1);
 
                 //close all pipes
                 for (int i = 0; i < numPipes; ++i)
@@ -86,7 +87,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, char* f
 }
 
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
-int parseCommand(const int index, char **filename, struct commandObj* cmd, char* cmdString)
+int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 {
         char delim[] = " ";
         char* token;
@@ -106,14 +107,14 @@ int parseCommand(const int index, char **filename, struct commandObj* cmd, char*
         if (command2 != NULL)
         {
                 oRedirectSymbolDetected = 1;
-                *filename = command2;
-                while (*filename[0] == ' ') (*filename)++;
+                oFile = command2;
+                while (oFile[0] == ' ') oFile++;
         }
        
         /*Recusively parse pipes*/
         command2 = command1;
         command1 = strsep(&command2, "|"); //command1 = first command, command2 = rest of the cmdline
-        if(command2 != NULL) numPipes = parseCommand(index + 1, filename, cmd, command2);
+        if(command2 != NULL) numPipes = parseCommand(index + 1, cmd, command2);
 
         /*Define command struct*/
         while (command1[0] == ' ') command1++;
@@ -172,20 +173,20 @@ void builtin_commands(struct commandObj cmd, char* cmdString)
 void prepareExternalProcess(char *cmdString)
 {
         int numPipes;
-        char* filename = malloc(ARGLENGTH_MAX * sizeof(char));
+        oFile = malloc(ARGLENGTH_MAX * sizeof(char));
         commandObj cmd[PIPES_MAX];
 
         if (strlen(cmdString) == 0) return;
 
         /*Parse and check for errors*/
-        filename[0] = '\0';     //For conditional in executePipeline
-        numPipes = parseCommand(0, &filename, cmd, cmdString);
+        oFile[0] = '\0';     //For conditional in executePipeline
+        numPipes = parseCommand(0, cmd, cmdString);
         if (numPipes < 0)
         {
                 fprintf(stderr, "Error: too many process arguments\n");
                 return;
         }
-        if (strlen(filename) == 0 && oRedirectSymbolDetected)
+        if (strlen(oFile) == 0 && oRedirectSymbolDetected)
         {
                 fprintf(stderr, "Error: no output file\n");
                 return;
@@ -203,7 +204,7 @@ void prepareExternalProcess(char *cmdString)
                 if (pipe(fd[i]) != 0)
                         exit(EXIT_FAILURE);
         }
-        executePipeline(fd, exitval, cmd, filename, numPipes, 0);
+        executePipeline(fd, exitval, cmd, numPipes, 0);
        
         //restore detectors
         oRedirectSymbolDetected = 0;
