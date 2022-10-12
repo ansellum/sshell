@@ -82,7 +82,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
                         close(fd[i][1]);
                 }
                 //execute program
-                exitval[index] = execvp(cmd[index].program, cmd[index].arguments);
+                execvp(cmd[index].program, cmd[index].arguments);
         }
         else if (pid > 0) { //Parent process
                 if (index < numPipes) executePipeline(fd, exitval, cmd, numPipes, index + 1);
