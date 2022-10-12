@@ -10,6 +10,7 @@
 #define NUMARGS_MAX 16
 #define ARGLENGTH_MAX 32
 #define PIPES_MAX 4
+#define NUM_DELIMS 3
 
 int oRedirectSymbolDetected = 0;
 int iRedirectSymbolDetected = 0;
@@ -70,6 +71,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
 
                 if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
                 else if (iRedirectSymbolDetected)       redirectInput(fd[index][0]);
+
                 if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
                 else if (oRedirectSymbolDetected)       redirectOutput(fd[index][1]);               //check if filename is detected, and execute redirection
 
@@ -99,7 +101,6 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
 int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
 {
-        char delim[] = " ";
         char* token;
         int numPipes = index;
         int argIndex = 1;
@@ -109,34 +110,38 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         char* command2 = malloc(CMDLINE_MAX * sizeof(char));
         strcpy(command1, cmdString);
        
-        /*Parse output redirection symbol*/
-        command2 = command1;
-        command1 = strsep(&command2, "<"); //command1 = before '<', command2 = after '<'
-        if (command2 != NULL)
-        {
-                iRedirectSymbolDetected = 1;
-                iFile = command2;
-                while (iFile[0] == ' ') iFile++;
-        }
+        int delims[NUM_DELIMS] = { '<', '>', '|' };
 
         /*Parse output redirection symbol*/
-        command2 = command1;
-        command1 = strsep(&command2, ">"); //command1 = before '>', command2 = after '>'
-        if (command2 != NULL)
+        for (int i = 0; i < NUM_DELIMS; ++i)
         {
-                oRedirectSymbolDetected = 1;
-                oFile = command2;
-                while (oFile[0] == ' ') oFile++;
+                command2 = command1;
+                command1 = strsep(&command2, delims[i] + "");
+
+                if (command2 == NULL) break;    //Nothing Found
+
+                switch (delims[i]) {
+                case '<':
+                        iRedirectSymbolDetected = 1;
+                        iFile = command2;
+                        while (iFile[0] == ' ') iFile++;
+                        break;
+
+                case '>':
+                        oRedirectSymbolDetected = 1;
+                        oFile = command2;
+                        while (oFile[0] == ' ') oFile++;
+                        break;
+
+                case '|':
+                        numPipes = parseCommand(index + 1, cmd, command2);
+                        break;
+                }
         }
-       
-        /*Recusively parse pipes*/
-        command2 = command1;
-        command1 = strsep(&command2, "|"); //command1 = first command, command2 = rest of the cmdline
-        if(command2 != NULL) numPipes = parseCommand(index + 1, cmd, command2);
 
         /*Define command struct*/
         while (command1[0] == ' ') command1++;
-        token = strsep(&command1, delim);
+        token = strsep(&command1, " ");
         cmd[index].program = token;
         cmd[index].arguments[0] = token;
         cmd[index].numArgs = 0;
@@ -150,7 +155,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                 while (command1[0] == ' ') command1++;
 
                 //update token
-                token = strsep(&command1, delim);
+                token = strsep(&command1, " ");
 
                 //pass command arguments
                 if (strlen(token) == 0) break;
@@ -197,8 +202,10 @@ void prepareExternalProcess(char *cmdString)
 
         if (strlen(cmdString) == 0) return;
 
-        /*Parse and check for errors*/
+        /*Parse*/
         numPipes = parseCommand(0, cmd, cmdString);
+
+        /*Post-parse error management*/
         if (numPipes < 0)
         {
                 fprintf(stderr, "Error: too many process arguments\n");
@@ -229,7 +236,7 @@ void prepareExternalProcess(char *cmdString)
         }
         executePipeline(fd, exitval, cmd, numPipes, 0);
        
-        //restore detectors
+        //restore global variables
         oRedirectSymbolDetected = 0;
         iRedirectSymbolDetected = 0;
         oFile = "";
