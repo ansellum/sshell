@@ -1,4 +1,4 @@
 sshell
 *.bak
 *.txt
-.vs
+.vs*
