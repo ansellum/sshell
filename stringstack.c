@@ -30,15 +30,17 @@ int push(stringStack *stack, char * element)
 	return EXIT_SUCCESS;
 }
 
-int pop(stringStack *stack)
+char * pop(stringStack *stack)
 {
+	char* prevDirectory = stack->items[stack->top];
+
 	//decrease top cursor and remove element
 	if (stack->top < 0)
-		return EXIT_FAILURE;
+		return NULL;
 
 	stack->items[stack->top][0] = '\0';
 
 	stack->top--;
 
-	return EXIT_SUCCESS;
+	return prevDirectory;
 }

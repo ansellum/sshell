@@ -12,6 +12,6 @@ stringStack* newStack(int size);
 
 int push(stringStack* stack, char * element);
 
-int pop(stringStack *stack);
+char * pop(stringStack *stack);
 
 #endif
