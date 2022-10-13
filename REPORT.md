@@ -56,23 +56,23 @@ a signal to stop.
 
 `prepareExternalProcess()` is exactly what it sounds like - it prepares *sshell*  
 for forking and execution of the command line. In order to reach this point,  
-`prepareExternalProcess()` iterates through a number of functions, each with one  
-specific purpose. As a result, the workflow of `prepareExternalProcess()` looks  
+`prepareExternalProcess()` iterates through a number of functions, each with a  
+specific purpose. As a result, `prepareExternalProcess()`'s flow is structured  
 something like this:
 
-1. Call parsing function
-
-   `numPipes = parseCommand(0, cmd, cmdString);`
-   
-2. Check for parsing errors
-3. Check (& execute) special commands (i.e. built-in and extra-feature commands)
-4. Prepare pipes and begin executing commands
+1. Call parsing functions (`parseCommand()')
+2. Check for parsing errors (`errorManagement()')
+3. Check (& execute) special commands (`specialCommands()')
+4. Prepare pipes and begin executing commands (`executePipeline()')
 5. Reset global variables
 6. Output completion message
  
 ### 2) Parse Command (The Analyst)
 
-- Overview: Parses through the full command string input, splits it up, and stores the data needed later.
+`parseCommand()' is by far the largest function in *sshell* in terms of  
+functionality. It sports two different sections; one for parsing delimiters  
+( '<', '>', '|' ) and the other for parsing arguments. Delimiters are parsed  
+before
 
 - Core Responsibilities:
 
