@@ -60,10 +60,10 @@ for forking and execution of the command line. In order to reach this point,
 specific purpose. As a result, `prepareExternalProcess()`'s flow is structured  
 something like this:
 
-1. Call parsing functions (`parseCommand()')
-2. Check for parsing errors (`errorManagement()')
-3. Check (& execute) special commands (`specialCommands()')
-4. Prepare pipes and begin executing commands (`executePipeline()')
+1. Call parsing functions (`parseCommand()`)
+2. Check for parsing errors (`errorManagement()`)
+3. Check (& execute) special commands (`specialCommands()`)
+4. Prepare pipes and begin executing commands (`executePipeline()`)
 5. Reset global variables
 6. Output completion message
  
