@@ -13,18 +13,18 @@ following features:
 The main design considerations of sshell include a focus on single-purpose  
 statements, readability, and function separation.
 
-# Data Organization
+## Data Organization
 
 *sshell* uses two custom structs that help organize data within the program.  
 
-#### 1) CommandObj (sshell.c)
+### 1) CommandObj (sshell.c)
 This structure holds the necessary properties for a executing a **single command**  
 (i.e. not the entire command line). This includes the program name, an array of  
 arguments, and the total number of arguments.  
 
 This struct was designed specifically for *sshell*.
 
-#### 2) StringStack (stringstack.c)
+### 2) StringStack (stringstack.c)
 This structure represents a stack of string variables with a max string length  
 of PATH_MAX (4096) characters. It utilizes a constructor function which defines  
 the stack's upper item limit and two functions (`push()` and `pop()`) that help
@@ -34,7 +34,7 @@ This struct was designed to be a general standalone stack for strings. *sshell*
 expands on its  `push()` and `pop()` functions for use with directory names  
 (more on this below).
 
-#### Potential future modifications
+### Potential future modifications
 There was a plan to consolidate certain data types in a "Command Line" struct,  
 which would've helped organize properties of the **entire command line** such as  
 the file redirection global variables. Due to time constraints, this feature was  
@@ -42,7 +42,7 @@ not implemented in the final release.
 
 # Program Flow (Functions)
 
-### Main Function
+## Main Function
 
 This is where the program begins. The main function remains largely unchanged  
 from the skeletron provided at `/home/cs150jp/public/p1/sshell.c` on the CSIF  
@@ -52,7 +52,7 @@ The most important part of this function is the while statement that
 calls `prepareExternalFunction()` every loop and runs until the program receives  
 a signal to stop.
 
-### Prepare External Process (The Controller)
+## Prepare External Process (The Controller)
 
 `prepareExternalProcess()` is exactly what it sounds like - it prepares *sshell*  
 for forking and execution of the command line. In order to reach this point,  
@@ -60,11 +60,15 @@ for forking and execution of the command line. In order to reach this point,
 specific purpose. As a result, the workflow of `prepareExternalProcess()` looks  
 something like this:
 
-- call parsing funciton
-- complete high-level error checking
-- call builtin commands function
-- call execute pipeline function
-- output completion message
+1. Call parsing function
+
+   `numPipes = parseCommand(0, cmd, cmdString);`
+   
+2. Check for parsing errors
+3. Check (& execute) special commands (i.e. built-in and extra-feature commands)
+4. Prepare pipes and begin executing commands
+5. Reset global variables
+6. Output completion message
  
 ### 2) Parse Command (The Analyst)
 
