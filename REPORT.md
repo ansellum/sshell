@@ -15,7 +15,7 @@ following features:
 The main design considerations of sshell include a focus on single-purpose  
 statements, readability, and function separation.
 
-## Structures
+## Data Organization
 
 *sshell* uses two custom structs that help organize data within the program.  
 
@@ -38,8 +38,9 @@ expands on its  `push()` and `pop()` functions for use with directory names
 
 #### Potential future modifications
 There was a plan to consolidate certain data types in a "Command Line" struct,  
-which would've helped organize properties of the **entire command line**. Due to  
-time constraints, this feature was not implemented in the final release.
+which would've helped organize properties of the **entire command line** such as  
+the file redirection global variables. Due to time constraints, this feature was  
+not implemented in the final release.
 
 ## Program Flow (Functions)
 
@@ -50,21 +51,22 @@ from the skeletron provided at `/home/cs150jp/public/p1/sshell.c` on the CSIF
 systems.  
 
 The most important part of this function is the while statement that  
-calls `prepareExternalFunction()` and runs until the program receives a signal  
-to stop.
+calls `prepareExternalFunction()` every loop and runs until the program receives  
+a signal to stop.
 
-### 1) Prepare External Process
-###### The Controller
+### Prepare External Process (The Controller)
 
-Calls the two subsequent main components and determines the high level flow of our program. 
+`prepareExternalProcess()` is exactly what it sounds like - it prepares *sshell*  
+for forking and execution of the command line. In order to reach this point,  
+`prepareExternalProcess()` iterates through a number of functions, each with one  
+specific purpose. As a result, the workflow of `prepareExternalProcess()` looks  
+something like this:
 
-- Core Responsibilities:
-
-    - call parsing funciton
-    - complete high-level error checking
-    - call builtin commands function
-    - call execute pipeline function
-    - output completion message
+- call parsing funciton
+- complete high-level error checking
+- call builtin commands function
+- call execute pipeline function
+- output completion message
  
 ### 2) Parse Command (The Analyst)
 
