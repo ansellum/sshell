@@ -9,9 +9,11 @@
 
 #include "stringstack.h"
 
+#define ARGLENGTH_MAX 32
 #define CMDLINE_MAX 512
 #define NUM_DELIMS 3
 #define NUMARGS_MAX 16
+#define PATH_MAX 4096
 #define PIPES_MAX 4
 #define STACK_SIZE 104
 
@@ -52,7 +54,7 @@ int changeDirectory(char* directory)
 
 int printWorkingDirectory()
 {
-        char cwd[FILENAME_MAX];
+        char cwd[PATH_MAX];
 
         if (getcwd(cwd, sizeof(cwd)) == NULL) return 1;
         fprintf(stdout, "%s\n", cwd);
@@ -252,7 +254,7 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
         //Directory Stack
         if (!strcmp(cmd.program, "pushd"))
         {
-                char cwd[FILENAME_MAX];
+                char cwd[PATH_MAX];
 
                 if (getcwd(cwd, sizeof(cwd)) == NULL)
                 {
@@ -293,7 +295,7 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
         {
                 error = printWorkingDirectory();
 
-                for (int i = directoryStack->top; i >= 0; ++i) fprintf(stdout, "%s\n", directoryStack->items[i]);
+                for (int i = directoryStack->top; i >= 0; --i) fprintf(stdout, "%s\n", directoryStack->items[i]);
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
                 return 1;
         }

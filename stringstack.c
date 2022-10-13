@@ -4,12 +4,15 @@
 
 #include "stringstack.h"
 
+#define PATH_MAX 4096
+
 stringStack* newStack(int size)
 {
-	stringStack *stack = (stringStack*)malloc(sizeof(stringStack));
+	stringStack* stack = (stringStack*)malloc(sizeof(stringStack));
 
 	stack->maxSize = size;
 	stack->top = -1;
+	stack->items = malloc(size * sizeof(char*));
 
 	return stack;
 }
@@ -21,8 +24,7 @@ int push(stringStack *stack, char * element)
 		return EXIT_FAILURE;
 
 	stack->top++;
-
-	stack->items[stack->top] = (char*)malloc(ARGLENGTH_MAX * sizeof(char));
+	stack->items[stack->top] = malloc(PATH_MAX * sizeof(char));
 	strcpy(stack->items[stack->top], element);
 
 	return EXIT_SUCCESS;
