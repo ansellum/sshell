@@ -223,6 +223,7 @@ int errorManagement(int error)
         return 0;
 }
 
+/*Commands that need special instruction.*/
 int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack)
 {
         //Built-in Commands
@@ -258,8 +259,16 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
 
                 if (getcwd(cwd, sizeof(cwd)) == NULL)
                 {
-                        fprintf(stderr, "Error: couldn't get working directory\n");
+                        fprintf(stderr, "Error: couldn't get current working directory\n");
                         fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_FAILURE);
+                        return 1;
+                }
+                
+                error = changeDirectory(cmd.arguments[1]);
+                if (error)
+                {
+                        fprintf(stderr, "Error: no such directory\n"); //directory probably deleted
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
                         return 1;
                 }
 
@@ -270,29 +279,44 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
                         fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
                         return 1;
                 }
-
-                error = changeDirectory(cmd.arguments[1]);
-                if (error) fprintf(stderr, "Error: no such directory\n"); //directory probably deleted
-
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
-                return 1;
         }        
         if (!strcmp(cmd.program, "popd"))
         {
-                error = changeDirectory(directoryStack->items[directoryStack->top]);
+                char* prevWorkingDirectory = directoryStack->items[directoryStack->top];
 
-                if (error) fprintf(stderr, "Error: cannot cd into directory\n");
-                else
+                if (cmd.arguments[1] != NULL)
                 {
-                        error = pop(directoryStack);
-                        if (error) fprintf(stderr, "Error: directory stack empty\n");
+                        fprintf(stderr, "Error: extra operant '%s'\n", cmd.arguments[1]);
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_FAILURE);
+                        return 1;
                 }
 
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
-                return 1;
+                error = pop(directoryStack);
+                if (error)
+                {
+                        fprintf(stderr, "Error: directory stack empty\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
+                        return 1;
+                }
+
+                error = changeDirectory(prevWorkingDirectory);
+                if (error)
+                {
+                        fprintf(stderr, "Error: cannot cd into directory\n");
+                        return 1;
+                }
+
+                
         }
         if (!strcmp(cmd.program, "dirs"))
         {
+                if (cmd.arguments[1] != NULL)
+                {
+                        fprintf(stderr, "Error: extra operant '%s'\n", cmd.arguments[1]);
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_FAILURE);
+                        return 1;
+                }
+
                 error = printWorkingDirectory();
 
                 for (int i = directoryStack->top; i >= 0; --i) fprintf(stdout, "%s\n", directoryStack->items[i]);
