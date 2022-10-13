@@ -273,17 +273,13 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
                 }
 
                 error = push(directoryStack, cwd);
-                if (error)
-                {
-                        fprintf(stderr, "Error: directory stack full\n");
-                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
-                        return 1;
-                }
+                if (error) fprintf(stderr, "Error: directory stack full\n");
+
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
+                return 1;
         }        
         if (!strcmp(cmd.program, "popd"))
         {
-                char* prevWorkingDirectory = directoryStack->items[directoryStack->top];
-
                 if (cmd.arguments[1] != NULL)
                 {
                         fprintf(stderr, "Error: extra operant '%s'\n", cmd.arguments[1]);
@@ -291,22 +287,18 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
                         return 1;
                 }
 
-                error = pop(directoryStack);
-                if (error)
-                {
-                        fprintf(stderr, "Error: directory stack empty\n");
-                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
-                        return 1;
-                }
-
-                error = changeDirectory(prevWorkingDirectory);
+                error = changeDirectory(directoryStack->items[directoryStack->top]);
                 if (error)
                 {
                         fprintf(stderr, "Error: cannot cd into directory\n");
                         return 1;
                 }
 
-                
+                error = pop(directoryStack);
+                if (error) fprintf(stderr, "Error: directory stack empty\n");
+
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
+                return 1;
         }
         if (!strcmp(cmd.program, "dirs"))
         {
