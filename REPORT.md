@@ -1,6 +1,4 @@
-# Project #1
-
-## Introduction
+#Introduction
 
 The goal of this project is to understand important UNIX system calls by  
 developing a stripped-down UNIX shell named **sshell**. This version sports the  
@@ -15,7 +13,7 @@ following features:
 The main design considerations of sshell include a focus on single-purpose  
 statements, readability, and function separation.
 
-## Data Organization
+# Data Organization
 
 *sshell* uses two custom structs that help organize data within the program.  
 
@@ -42,7 +40,7 @@ which would've helped organize properties of the **entire command line** such as
 the file redirection global variables. Due to time constraints, this feature was  
 not implemented in the final release.
 
-## Program Flow (Functions)
+# Program Flow (Functions)
 
 ### Main Function
 
