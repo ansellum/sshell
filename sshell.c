@@ -1,23 +1,26 @@
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <errno.h>
-#include <fcntl.h>
+
+#include "stringstack.h"
 
 #define CMDLINE_MAX 512
-#define NUMARGS_MAX 16
-#define ARGLENGTH_MAX 32
-#define PIPES_MAX 4
 #define NUM_DELIMS 3
+#define NUMARGS_MAX 16
+#define PIPES_MAX 4
+#define STACK_SIZE 104
 
 int oRedirectSymbolDetected = 0;
 int iRedirectSymbolDetected = 0;
 char* oFile = "";
 char* iFile = "";
 
-typedef struct commandObj {
+typedef struct commandObj
+{
         char* program;
         char* arguments[NUMARGS_MAX + 1]; // +1 for program name
         int numArgs;
@@ -38,8 +41,7 @@ void redirectInput(int fd)
         dup2(fd, STDIN_FILENO);
 }
 
-/*Change directory*/
-int changeDirectory(char *directory)
+int changeDirectory(char* directory)
 {
         int status;
 
@@ -47,7 +49,6 @@ int changeDirectory(char *directory)
         return status;
 }
 
-/*Print current working directory*/
 int printWorkingDirectory()
 {
         char cwd[CMDLINE_MAX];
@@ -58,7 +59,7 @@ int printWorkingDirectory()
 }
 
 /*Executes an external command with fork(), execvp(), & waitpid() */
-void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int numPipes, const int index)
+void executePipeline(int fd[][2], int exitval[], commandObj* cmd, int numPipes, const int index)
 {
         int status;
         int pid = fork();
@@ -97,7 +98,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
 }
 
 /* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
-int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
+int parseCommand(const int index, commandObj* cmd, char* cmdString)
 {
         int argIndex = 1;
         int numPipes = index;
@@ -176,7 +177,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         return numPipes;
 }
 
-int error_management(int error)
+int errorManagement(int error)
 {
         switch (error) {
         case -1: // > file 
@@ -215,8 +216,9 @@ int error_management(int error)
         return 0;
 }
 
-int builtin_commands(struct commandObj cmd, char* cmdString)
+int specialCommands(commandObj cmd, char* cmdString)
 {
+        //Built-in Commands
         int status;
         if (!strcmp(cmd.program, "cd"))
         {
@@ -241,6 +243,9 @@ int builtin_commands(struct commandObj cmd, char* cmdString)
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
                 exit(EXIT_SUCCESS);
         }
+
+        //TODO: Extra Features
+        
         return 0;
 }
 
@@ -257,10 +262,10 @@ void prepareExternalProcess(char *cmdString)
         numPipes = parseCommand(0, cmd, cmdString);
 
         /*Post-parse error management*/
-        if(error_management(numPipes) != EXIT_SUCCESS) return;
+        if(errorManagement(numPipes) != EXIT_SUCCESS) return;
 
-        /* Builtin commands*/
-        if (builtin_commands(cmd[0], cmdString) != EXIT_SUCCESS) return;
+        /*Commands that require specific attention*/
+        if (specialCommands(cmd[0], cmdString) != EXIT_SUCCESS) return;
 
         /*Piping (works with single commands)*/
         int fd[numPipes][2];
