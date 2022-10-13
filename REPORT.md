@@ -2,11 +2,35 @@
 
 ## Introduction
 
-The goal of this project is to understand UNIX shells by developing a stripped-down version named **sshell**
+The goal of this project is to understand important UNIX system calls by  
+developing a stripped-down UNIX shell named **sshell**. This version sports the  
+following features:
 
-### 1) Prepare External Process (The Decision Maker)
+- Built-in UNIX commands w/ argument support (e.g. *date*, *ls*, *cd*)
+- Standard input & output redirection
+- Command piping (*up to three*)
+- Directory stack
+- Comprehensive error management
 
-- Overview: Calls the two subsequent main components and determines the high level flow of our program. 
+The main design considerations of sshell include a focus on single-purpose  
+statements, readability, and function separation.
+
+## Program Flow (Functions)
+
+### Main Function
+
+This is where the program begins. The main function remains largely unchanged  
+from the skeletron provided at `/home/cs150jp/public/p1/sshell.c` on the CSIF  
+systems.  
+
+The most important part of this function is the while statement that  
+calls `prepareExternalFunction()` and runs until the program receives a signal  
+to stop.
+
+### 1) Prepare External Process
+###### The Controller
+
+Calls the two subsequent main components and determines the high level flow of our program. 
 
 - Core Responsibilities:
 
