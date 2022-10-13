@@ -36,9 +36,8 @@ expands on its  `push()` and `pop()` functions for use with directory names
 
 ### Potential future modifications
 There was a plan to consolidate certain data types in a "Command Line" struct,  
-which would've helped organize properties of the **entire command line** such as  
-the file redirection global variables. Due to time constraints, this feature was  
-not implemented in the final release.
+which would've helped organize properties of the **entire command line**. Due to  
+time constraints, this feature was not implemented in the final release.
 
 # Program Flow (Functions)
 
@@ -48,10 +47,11 @@ This is where the program begins. The main function remains largely unchanged
 from the skeletron provided at `/home/cs150jp/public/p1/sshell.c` on the CSIF  
 systems.  
 
-The most important parts of this function are to create a directory stack using  
-the custom StringStack data type, and the while statement that calls  
-`prepareExternalFunction()` every loop and runs until the program receives a  
-signal to stop.
+The most important parts of this function are to
+1) capture the user Input  
+2) create a directory stack using the custom StringStack data type, and
+3) execute a while statement that calls prepareExternalFunction()` every loop
+   and runs until the program receives a signal to stop.
 
 ## Prepare External Process (The Controller)
 
