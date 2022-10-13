@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,18 +44,18 @@ void redirectInput(int fd)
 
 int changeDirectory(char* directory)
 {
-        int status;
+        int status = 0;
 
-        status = chdir(directory);
+        if (chdir(directory)) status = 1;
         return status;
 }
 
 int printWorkingDirectory()
 {
-        char cwd[CMDLINE_MAX];
+        char cwd[FILENAME_MAX];
 
         if (getcwd(cwd, sizeof(cwd)) == NULL) return 1;
-        printf("%s\n", cwd);
+        fprintf(stdout, "%s\n", cwd);
         return 0;
 }
 
@@ -168,12 +169,12 @@ int parseCommand(const int index, commandObj* cmd, char* cmdString)
                 if (strlen(token) == 0) break;
 
                 //pass command arguments
-                cmd[index].arguments[argIndex] = malloc(ARGLENGTH_MAX * sizeof(char));
+                cmd[index].arguments[argIndex] = (char*)malloc(ARGLENGTH_MAX * sizeof(char));
                 strcpy(cmd[index].arguments[argIndex], token);
                 cmd[index].numArgs = argIndex++;
         }
         cmd[index].arguments[argIndex] = NULL; //execvp()
-        
+
         return numPipes;
 }
 
@@ -204,7 +205,7 @@ int errorManagement(int error)
                 fprintf(stderr, "Error: mislocated output redirection\n");
                 return 1;
 
-        case -7:
+        case -7: // file does not exist
                 fprintf(stderr, "Error: cannot open output file \n");
                 return 1;
 
@@ -216,44 +217,88 @@ int errorManagement(int error)
         return 0;
 }
 
-int specialCommands(commandObj cmd, char* cmdString)
+int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack)
 {
         //Built-in Commands
-        int status;
+        int error;
+
         if (!strcmp(cmd.program, "cd"))
         {
-                status = changeDirectory(cmd.arguments[1]);
-                if (status)
-                {
-                        fprintf(stderr, "Error: cannot cd into directory\n");
-                        status = 1;
-                }
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
+                error = changeDirectory(cmd.arguments[1]);
+
+                if (error)      fprintf(stderr, "Error: cannot cd into directory\n");
+
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
                 return 1; 
         }
-        else if (!strcmp(cmd.program, "pwd"))
+        if (!strcmp(cmd.program, "pwd"))
         {
-                status = printWorkingDirectory();
-                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
+                error = printWorkingDirectory();
+
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
                 return 1;
         }
-        else if (!strcmp(cmd.program, "exit"))
+        if (!strcmp(cmd.program, "exit"))
         {
                 fprintf(stderr, "Bye...\n");
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
                 exit(EXIT_SUCCESS);
         }
 
-        //TODO: Extra Features
-        
+        //Directory Stack
+        if (!strcmp(cmd.program, "pushd"))
+        {
+                char cwd[FILENAME_MAX];
+
+                if (getcwd(cwd, sizeof(cwd)) == NULL)
+                {
+                        fprintf(stderr, "Error: couldn't get working directory\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_FAILURE);
+                        return 1;
+                }
+
+                error = push(directoryStack, cwd);
+                if (error)
+                {
+                        fprintf(stderr, "Error: directory stack full\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
+                        return 1;
+                }
+
+                error = changeDirectory(cmd.arguments[1]);
+                if (error) fprintf(stderr, "Error: no such directory\n"); //directory probably deleted
+
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
+                return 1;
+        }        
+        if (!strcmp(cmd.program, "popd"))
+        {
+                error = changeDirectory(directoryStack->items[directoryStack->top]);
+
+                if (error) fprintf(stderr, "Error: cannot cd into directory\n");
+                else
+                {
+                        error = pop(directoryStack);
+                        if (error) fprintf(stderr, "Error: directory stack empty\n");
+                }
+
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
+                return 1;
+        }
+        if (!strcmp(cmd.program, "dirs"))
+        {
+                error = printWorkingDirectory();
+
+                for (int i = directoryStack->top; i >= 0; ++i) fprintf(stdout, "%s\n", directoryStack->items[i]);
+                fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
+                return 1;
+        }
         return 0;
 }
 
-void prepareExternalProcess(char *cmdString)
+void prepareExternalProcess(char *cmdString, stringStack *directoryStack)
 {
         int numPipes;
-        oFile = malloc(ARGLENGTH_MAX * sizeof(char));
-        iFile = malloc(ARGLENGTH_MAX * sizeof(char));
         commandObj cmd[PIPES_MAX];
 
         if (strlen(cmdString) == 0) return;
@@ -265,7 +310,7 @@ void prepareExternalProcess(char *cmdString)
         if(errorManagement(numPipes) != EXIT_SUCCESS) return;
 
         /*Commands that require specific attention*/
-        if (specialCommands(cmd[0], cmdString) != EXIT_SUCCESS) return;
+        if (specialCommands(cmd[0], cmdString, directoryStack) != EXIT_SUCCESS) return;
 
         /*Piping (works with single commands)*/
         int fd[numPipes][2];
@@ -296,6 +341,10 @@ void prepareExternalProcess(char *cmdString)
 int main(void)
 {
         char cmdString[CMDLINE_MAX];
+        stringStack *directoryStack = newStack(STACK_SIZE);
+
+        oFile = (char*)malloc(ARGLENGTH_MAX * sizeof(char));
+        iFile = (char*)malloc(ARGLENGTH_MAX * sizeof(char));
 
         while (1) {
                 char *nl;
@@ -317,7 +366,7 @@ int main(void)
                 nl = strchr(cmdString, '\n');
                 if (nl) *nl = '\0';
 
-                prepareExternalProcess(cmdString);
+                prepareExternalProcess(cmdString, directoryStack);
         }
        
         return EXIT_SUCCESS;

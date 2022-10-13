@@ -4,14 +4,14 @@
 
 #include "stringstack.h"
 
-stringStack newStack(int size)
+stringStack* newStack(int size)
 {
 	stringStack *stack = (stringStack*)malloc(sizeof(stringStack));
 
 	stack->maxSize = size;
 	stack->top = -1;
 
-	return *stack;
+	return stack;
 }
 
 int push(stringStack *stack, char * element)
@@ -21,17 +21,21 @@ int push(stringStack *stack, char * element)
 		return EXIT_FAILURE;
 
 	stack->top++;
+
+	stack->items[stack->top] = (char*)malloc(ARGLENGTH_MAX * sizeof(char));
 	strcpy(stack->items[stack->top], element);
 
 	return EXIT_SUCCESS;
 }
 
-int pop(stringStack* stack)
+int pop(stringStack *stack)
 {
 	//decrease top cursor and remove element
 	if (stack->top < 0)
 		return EXIT_FAILURE;
+
 	stack->items[stack->top][0] = '\0';
+
 	stack->top--;
 
 	return EXIT_SUCCESS;
