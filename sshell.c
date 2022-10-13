@@ -125,7 +125,9 @@ int parseCommand(const int index, commandObj* cmd, char* cmdString)
                 case 0: // < input redirection
                         if (strlen(command2) == 0)              return -2; //Error: no input file
                         if (strchr(command2, '|') != NULL)      return -3; //Error: mislocated input redirection
-                        if (access(command2, R_OK) != 0)        return -4; //Error: cannot open input file
+
+                        access(command2, R_OK);
+                        if(errno == ENOENT)                     return -4; //Error: cannot open input file (does not exist)
 
                         iRedirectSymbolDetected = 1;
                         iFile = command2;
@@ -135,7 +137,9 @@ int parseCommand(const int index, commandObj* cmd, char* cmdString)
                 case 1: // > output redirection
                         if (strlen(command2) == 0)              return -5; //Error: no output file
                         if (strchr(command2, '|') != NULL)      return -6; //Error: mislocated output redirection
-                        if (access(command2, W_OK) != 0)        return -7; //Error: cannot open output file
+
+                        access(command2, W_OK);
+                        if (errno == EACCES)                    return -7; //Error: cannot open output file (permission denied)
 
                         oRedirectSymbolDetected = 1;
                         oFile = command2;
