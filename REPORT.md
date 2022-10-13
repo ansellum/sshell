@@ -69,7 +69,7 @@ something like this:
  
 ### 2) Parse Command (The Analyst)
 
-`parseCommand()' is by far the largest function in *sshell* in terms of  
+`parseCommand()` is by far the largest function in *sshell* in terms of  
 functionality. It sports two different sections; one for parsing delimiters  
 ( '<', '>', '|' ) and the other for parsing arguments. Delimiters are parsed  
 before
