@@ -62,6 +62,7 @@ int printWorkingDirectory()
         return 0;
 }
 
+/*Executes an external command with fork(), execvp(), & waitpid() */
 void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int numPipes, const int index)
 {
         int status;
@@ -188,7 +189,6 @@ void builtin_commands(struct commandObj cmd, char* cmdString)
         }
 }
 
- /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
 void prepareExternalProcess(char *cmdString)
 {
         int numPipes;
