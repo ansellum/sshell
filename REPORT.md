@@ -15,6 +15,21 @@ following features:
 The main design considerations of sshell include a focus on single-purpose  
 statements, readability, and function separation.
 
+## Structures
+
+*sshell* uses two custom structs that help organize data within the program.  
+
+### CommandObj
+###### sshell.c
+This structure holds the necessary properties for a executing a **single command**  
+(i.e. not the entire command line). This includes the program name, an array of  
+arguments, and the total number of arguments.  
+
+This struct was designed specifically for *sshell*.
+
+### StringStack
+This structure represents a stack of string variables with 
+
 ## Program Flow (Functions)
 
 ### Main Function
