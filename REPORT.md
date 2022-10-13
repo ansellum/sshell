@@ -48,9 +48,10 @@ This is where the program begins. The main function remains largely unchanged
 from the skeletron provided at `/home/cs150jp/public/p1/sshell.c` on the CSIF  
 systems.  
 
-The most important part of this function is the while statement that  
-calls `prepareExternalFunction()` every loop and runs until the program receives  
-a signal to stop.
+The most important parts of this function are to create a directory stack using  
+the custom StringStack data type, and the while statement that calls  
+`prepareExternalFunction()` every loop and runs until the program receives a  
+signal to stop.
 
 ## Prepare External Process (The Controller)
 
@@ -67,7 +68,7 @@ something like this:
 5. Reset global variables
 6. Output completion message
  
-### Parse Command (The Analyst)
+## Parse Command (The Analyst)
 
 `parseCommand()` is by far the largest function in *sshell* in terms of  
 functionality. It sports two different sections; one for parsing delimiters  
@@ -82,11 +83,17 @@ be passed to `executePipeline()`.
 This return value has a second functionality in error management, returning a  
 unique negative error code for each type of parsing error.
 
-### Error Management
+## Error Management (The IT guy)
 `errorManagement()` deciphers the exit code from `parseCommand()` using a switch  
-statement, handling the exit and associated error message.
+statement. If one of the error codes match, the function will output the  
+associated error and cause *sshell* to start a new command line.
 
-### Execute Pipeline (The Action Taker)
+## Special Commands (The Specialist)
+`specialCommands()` checks the first (leftmost) commmandObj's program name  
+against commands that require special attention. These are a combination of  
+built-in commands (`cd`, `pwd`, `exit`) and directory stack commands.
+
+## Execute Pipeline (The Action Taker)
 
 - Overview: If pipes have been used, sets up pipeline and calls execvp() to execute commands with the data collected during parsing.
 
