@@ -19,16 +19,21 @@ statements, readability, and function separation.
 
 *sshell* uses two custom structs that help organize data within the program.  
 
-#### CommandObj
-###### Definition:sshell.c
+#### CommandObj (sshell.c)
 This structure holds the necessary properties for a executing a **single command**  
 (i.e. not the entire command line). This includes the program name, an array of  
 arguments, and the total number of arguments.  
 
 This struct was designed specifically for *sshell*.
 
-#### StringStack
-This structure represents a stack of string variables with 
+#### StringStack (stringstack.c)
+This structure represents a stack of string variables with a max string length  
+of PATH_MAX (4096) characters. It utilizes a constructor function which defines  
+the stack's upper item limit and two functions (`push()` and `pop()`) that help
+the user interact with the stack.
+
+This struct was designed to be a general standalone stack for strings. *sshell*  
+expands on its  `push()` and `pop()` functions for use with directory names.
 
 ## Program Flow (Functions)
 
