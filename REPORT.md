@@ -1,6 +1,8 @@
-# Project #1 Design
+# Project #1
 
-## Main Components
+## Introduction
+
+The goal of this project is to understand UNIX shells by developing a stripped-down version named **sshell**
 
 ### 1) Prepare External Process (The Decision Maker)
 
