@@ -27,7 +27,7 @@ This struct was designed specifically for *sshell*.
 ### 2) StringStack (stringstack.c)
 This structure represents a stack of string variables with a max string length  
 of PATH_MAX (4096) characters. It utilizes a constructor function which defines  
-the stack's upper item limit and two functions (`push()` and `pop()`) that help
+the stack's upper item limit and two functions (`push()` and `pop()`) that help  
 the user interact with the stack.
 
 This struct was designed to be a general standalone stack for strings. *sshell*  
@@ -67,23 +67,26 @@ something like this:
 5. Reset global variables
 6. Output completion message
  
-### 2) Parse Command (The Analyst)
+### Parse Command (The Analyst)
 
 `parseCommand()` is by far the largest function in *sshell* in terms of  
 functionality. It sports two different sections; one for parsing delimiters  
 ( '<', '>', '|' ) and the other for parsing arguments. Delimiters are parsed  
-before
+*before* arguments as to avoid confusing filenames with arguments.  
 
-- Core Responsibilities:
+`parseCommand()` utilizes recursive functionality to handle pipes, calling  
+itself iteratively until there are no more `|` symbols detected. This is  
+performed using a return value which increments once per pipe, which will later  
+be passed to `executePipeline()`. 
 
-    - detect if delimiters have been inputted ( "<" , ">" , or "|") and handle appropriately
-    - store program names ('date', 'echo', ect.)
-    - verify the number of arguments inputted is within the limit and ignore extraneous spaces
-    - store arguments for programs
+This return value has a second functionality in error management, returning a  
+unique negative error code for each type of parsing error.
 
-- Note: function recursively calls itself if pipes are detected in order to store information for each individual command in pipeline
+### Error Management
+`errorManagement()` deciphers the exit code from `parseCommand()` using a switch  
+statement, handling the exit and associated error message.
 
-### 3) Execute Pipeline (The Action Taker)
+### Execute Pipeline (The Action Taker)
 
 - Overview: If pipes have been used, sets up pipeline and calls execvp() to execute commands with the data collected during parsing.
 
