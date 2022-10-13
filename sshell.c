@@ -145,7 +145,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                 }
         }
 
-        /*PARSE COMMAND PROPERTIES*/
+        /*PARSE PROPERTIES*/
         while (command1[0] == ' ') command1++;
         token = strsep(&command1, " ");
 
@@ -175,9 +175,48 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
         return numPipes;
 }
 
+int error_management(int error)
+{
+        switch (error) {
+        case -1: // > file 
+                fprintf(stderr, "Error: missing command\n");
+                return 1;
+
+        case -2: // sort <
+                fprintf(stderr, "Error: no input file\n");
+                return 1;
+
+        case -3: // < before |
+                fprintf(stderr, "Error: mislocated input redirection\n");
+                return 1;
+
+        case -4:
+                fprintf(stderr, "Error: cannot open input file \n");
+                return 1;
+
+        case -5: // echo >
+                fprintf(stderr, "Error: no output file\n");
+                return 1;
+
+        case -6: // > before |
+                fprintf(stderr, "Error: mislocated output redirection\n");
+                return 1;
+
+        case -7:
+                fprintf(stderr, "Error: cannot open output file \n");
+                return 1;
+
+        case -8: // $ ls 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+                fprintf(stderr, "Error: too many process arguments\n");
+                return 1;
+        }
+
+        return 0;
+}
+
 int builtin_commands(struct commandObj cmd, char* cmdString)
 {
-        int status = 0;
+        int status;
         if (!strcmp(cmd.program, "cd"))
         {
                 status = changeDirectory(cmd.arguments[1]);
@@ -187,13 +226,13 @@ int builtin_commands(struct commandObj cmd, char* cmdString)
                         status = 1;
                 }
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
-                return status;
+                return 1; 
         }
         else if (!strcmp(cmd.program, "pwd"))
         {
                 status = printWorkingDirectory();
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, status);
-                return status;
+                return 1;
         }
         else if (!strcmp(cmd.program, "exit"))
         {
@@ -201,7 +240,7 @@ int builtin_commands(struct commandObj cmd, char* cmdString)
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_SUCCESS);
                 exit(EXIT_SUCCESS);
         }
-        return status;
+        return 0;
 }
 
  /*Executes an external command with fork(), exec(), & wait() (phase 1)*/
@@ -218,42 +257,10 @@ void prepareExternalProcess(char *cmdString)
         numPipes = parseCommand(0, cmd, cmdString);
 
         /*Post-parse error management*/
-        switch (numPipes) {
-        case -1: // > file 
-                fprintf(stderr, "Error: missing command\n");
-                return;
-
-        case -2: // sort <
-                fprintf(stderr, "Error: no input file\n");
-                return;
-
-        case -3: // < before |
-                fprintf(stderr, "Error: mislocated input redirection\n");
-                return;   
-
-        case -4: 
-                fprintf(stderr, "Error: cannot open input file \n");
-                return;
-
-        case -5: // echo >
-                fprintf(stderr, "Error: no output file\n");
-                return;
-
-        case -6: // > before |
-                fprintf(stderr, "Error: mislocated output redirection\n");
-                return;
-
-        case -7:
-                fprintf(stderr, "Error: cannot open output file \n");
-                return;
-
-        case -8: // $ ls 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
-                fprintf(stderr, "Error: too many process arguments\n");
-                return;
-        }      
+        if(error_management(numPipes) != EXIT_SUCCESS) return;
 
         /* Builtin commands*/
-        if (builtin_commands(cmd[0], cmdString)) return;
+        if (builtin_commands(cmd[0], cmdString) != EXIT_SUCCESS) return;
 
         /*Piping (works with single commands)*/
         int fd[numPipes][2];
