@@ -79,6 +79,7 @@ void executePipeline(int fd[][2], int exitval[], struct commandObj* cmd, int num
                 //execute program
                 execvp(cmd[index].program, cmd[index].arguments);
                 if (errno = ENOENT) fprintf(stderr, "Error: command not found\n");
+                exit(EXIT_FAILURE);
         }
         else if (pid > 0) { //Parent process
                 if (index < numPipes) executePipeline(fd, exitval, cmd, numPipes, index + 1);
@@ -113,6 +114,7 @@ int parseCommand(const int index, struct commandObj* cmd, char* cmdString)
                 command1 = strsep(&command2, delims[i]);
 
                 if (command2 == NULL) continue; //Nothing Found
+                while (command2[0] == ' ') command2++;
 
                 if (strlen(command1) == 0 || (strlen(command2) == 0 && i == 2)) return -1; //Error: Missing command
 
