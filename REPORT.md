@@ -74,7 +74,7 @@ iteratively stores each argument in the data structure.
 If there is a parsing error from the parse step, `numPipes` will be set to a  
 unique negative value. This value is passed to `errorManagement()`, which will  
 decipher the error and return from execution (i.e. trash the command line and  
-ask for another).
+reprompt).
 
 
 
