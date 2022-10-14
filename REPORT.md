@@ -185,10 +185,9 @@ executePipeline()
 		else if (inputRedirectDetected)  redirectInput(fd[index][0]);
 		if (index < numPipes)            dup2(fd[index][1], STDOUT_FILENO);
 		else if (outputRedirectDetected) redirectOutput(fd[index][1]);
-		
 		...
-		
 		execvp(command[index], arguments);
+		//error management
 	}
 }
 ```
