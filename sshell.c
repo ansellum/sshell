@@ -270,19 +270,19 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
                         fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, EXIT_FAILURE);
                         return 1;
                 }
-                
-                error = changeDirectory(cmd.arguments[1]);
-                if (error)
-                {
-                        fprintf(stderr, "Error: no such directory\n"); //directory probably deleted
-                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
-                        return 1;
-                }
 
                 error = push(directoryStack, cwd);
                 if (error)
                 {
                         fprintf(stderr, "Error: directory stack full\n");
+                        fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);
+                        return 1;
+                }
+
+                error = changeDirectory(cmd.arguments[1]);
+                if (error)
+                {
+                        fprintf(stderr, "Error: no such directory\n"); //directory probably deleted
                 }
 
                 fprintf(stderr, "+ completed '%s' [%d]\n", cmdString, error);

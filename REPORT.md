@@ -47,27 +47,24 @@ The implementation of this program follows five distinct steps:
 ### Parse User Input
 
 At the beginning of its execution, `sshell` will capture user input and build a  
-*StringStack* data structure which will be used for the directory stack. This  
-data structure is a single object containing stack properties and two  
-functions which help interact with the stack (`push()` and `pop()`). The user  
-input is immedietely parsed using two phases, one for delimiters  
-(`parseDelimiter()`) and one for a **single command** (`parseCommand()`).
+*StringStack* data structure which will be used for the directory stack. The  
+user input is immedietely parsed using two phases, the first for delimiters  
+(`parseDelimiter()`) and second for a **single command** (`parseCommand()`).
 
-The first phase parses delimiters for I/O redirection and piping, returning  
-if a parsing error is detected. This is done returning unique negative values  
-which indicate the type of parsing error. If this phase detects a `>` or `<`  
-character in the command line, it will note the file's existence using global  
-variables. If this phase detects a `|` character, it will recursively call  
-`parseDelimiter()`, passing the string that was beyond the pipe character, until  
-there are no more pipe characters detected. This creates multiple layers of  
-`parseDelimiter()`, each with a single command that passes to `parseCommand()'.
+   The first phase parses delimiters for I/O redirection and piping, returning  
+   if a parsing error is detected. This is done returning unique negative values  
+   which indicate the type of parsing error. If this phase detects a `>` or `<`  
+   character in the command line, it will note the file's existence using global  
+   variables. If this phase detects a `|` character, it will recursively call  
+   `parseDelimiter()`, passing the string that was beyond the pipe character,
+   until there are no more pipe characters detected. This creates multiple  
+   layers of `parseDelimiter()`, each with a single command that passes to  
+   `parseCommand()'.  
 
-The second phase of the parse takes the command string passed by  
-`parseDelimiter()` and parses it into a *commandObj* data structure. This data  
-structure contains string fields for the program name and arguments, as well as  
-a field for the number of arguments (this is useful for execution). Parsing is  
-accomplished using `strsep()` to separate the command string and a while loop to  
-iteratively stores each argument in the data structure.
+   The second phase of the parse takes the command string passed by  
+   `parseDelimiter()` and parses it into a *commandObj* data structure. Parsing  
+   is accomplished using `strsep()` to separate the command string and a while  
+   loop to iteratively stores each argument in the data structure.  
 
 ### Error Management
 
@@ -75,6 +72,31 @@ If there is a parsing error from the parse step, `numPipes` will be set to a
 unique negative value. This value is passed to `errorManagement()`, which will  
 decipher the error and return from execution (i.e. trash the command line and  
 reprompt).
+
+### Special Commands
+
+With errors checked, `sshell` will then check if a command was input that  
+requires special attention. This includes the built-in commands (`cd`, `pwd`,  
+ `exit`) and the commands used for the directory stack.  
+ 
+   `cd` and `pwd` use C library commands that change the directory and print the  
+   current working directory respectively.  
+   `exit` will call the `exit()` C command with EXIT_SUCCESS.  
+   
+   `dirs` uses the pre-existing `pwd` function and iterates through the  
+   *StringStack* items, printing them from last to first. This correlates to  
+   printing the stored directories from top to bottom within the *StringStack*.  
+   `pushd` first pushes the current working directory to the stack using `pop()`,  
+   then changes the directory.  
+   `popd` must use `pop()` before changing directory. This is because the `pop()`  
+   function checks if an empty 
+
+
+
+
+
+
+
 
 
 
