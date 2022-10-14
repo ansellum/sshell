@@ -1,7 +1,8 @@
-# Introduction
+# SSHELL: a stripped UNIX sshell
 
+## Summary
 The goal of this project is to understand important UNIX system calls by  
-developing a stripped-down UNIX shell named **sshell**. This version sports the  
+developing a barebones UNIX shell named **sshell**. This version sports the  
 following features:
 
 - Built-in UNIX commands w/ argument support (e.g. *date*, *ls*, *cd*)
@@ -38,6 +39,15 @@ expands on its  `push()` and `pop()` functions for use with directory names
 There was a plan to consolidate certain data types in a "Command Line" struct,  
 which would've helped organize properties of the **entire command line**. Due to  
 time constraints, this feature was not implemented in the final release.
+
+## Implementation
+The implementation of this program follows X distinct steps:
+
+1. Parse the user input using a command struct for organization
+2. Check for errors and special exceptions
+3. Execute user input
+
+
 
 # Program Flow (Functions)
 
