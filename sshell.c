@@ -99,18 +99,52 @@ void executePipeline(int fd[][2], int exitval[], commandObj* cmd, int numPipes, 
         if (WIFEXITED(status)) exitval[index] = WEXITSTATUS(status);
 }
 
-/* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
-int parseCommand(const int index, commandObj* cmd, char* cmdString)
+int parseCommand(const int index, commandObj* cmd, char* command1)
 {
         int argIndex = 1;
+        char* token;
+
+        /*PARSE PROPERTIES*/
+        while (command1[0] == ' ') command1++;
+        token = strsep(&command1, " ");
+
+        cmd[index].program = token;
+        cmd[index].arguments[0] = token;
+        cmd[index].numArgs = 0;
+
+        while (command1 != NULL && strlen(command1) != 0) {
+                //Pre-token error processing
+                if (argIndex >= NUMARGS_MAX) return EXIT_FAILURE;   //Error: Too many arguments
+
+                //skip extra spaces
+                while (command1[0] == ' ') command1++;
+
+                token = strsep(&command1, " ");
+
+                //Post-token error checking
+                if (strlen(token) == 0) break;
+
+                //pass command arguments
+                cmd[index].arguments[argIndex] = (char*)malloc(ARGLENGTH_MAX * sizeof(char));
+                strcpy(cmd[index].arguments[argIndex], token);
+                cmd[index].numArgs = argIndex++;
+        }
+        cmd[index].arguments[argIndex] = NULL; //execvp()
+
+        return EXIT_SUCCESS;
+}
+
+/* Parses command into commandObj properties. Returns # of cmd objects, -1 if too many arguments in one command*/
+int parseDelimiters(const int index, commandObj* cmd, char* cmdString)
+{
         int numPipes = index;
+
         char* command1 = malloc(CMDLINE_MAX * sizeof(char));
         char* command2 = malloc(CMDLINE_MAX * sizeof(char));
         char* delims[NUM_DELIMS] = { "<" , ">" , "|" };
-        char* token;
 
         strcpy(command1, cmdString);
-       
+
         /*PARSE DELIMITERS*/
         for (int i = 0; i < NUM_DELIMS; ++i)
         {
@@ -128,7 +162,7 @@ int parseCommand(const int index, commandObj* cmd, char* cmdString)
                         if (strchr(command2, '|') != NULL)      return -3; //Error: mislocated input redirection
 
                         access(command2, R_OK);
-                        if(errno == ENOENT)                     return -4; //Error: cannot open input file (does not exist)
+                        if (errno == ENOENT)                     return -4; //Error: cannot open input file (does not exist)
 
                         iRedirectSymbolDetected = 1;
                         iFile = command2;
@@ -148,37 +182,11 @@ int parseCommand(const int index, commandObj* cmd, char* cmdString)
                         break;
 
                 case 2: // | piping
-                        numPipes = parseCommand(index + 1, cmd, command2);
+                        numPipes = parseDelimiters(index + 1, cmd, command2);
                         break;
                 }
         }
-
-        /*PARSE PROPERTIES*/
-        while (command1[0] == ' ') command1++;
-        token = strsep(&command1, " ");
-
-        cmd[index].program = token;
-        cmd[index].arguments[0] = token;
-        cmd[index].numArgs = 0;
-
-        while ( command1 != NULL && strlen(command1) != 0) {
-                //Pre-token error processing
-                if (argIndex >= NUMARGS_MAX) return -8;   //Error: Too many arguments
-
-                //skip extra spaces
-                while (command1[0] == ' ') command1++;
-
-                token = strsep(&command1, " ");
-
-                //Post-token error checking
-                if (strlen(token) == 0) break;
-
-                //pass command arguments
-                cmd[index].arguments[argIndex] = (char*)malloc(ARGLENGTH_MAX * sizeof(char));
-                strcpy(cmd[index].arguments[argIndex], token);
-                cmd[index].numArgs = argIndex++;
-        }
-        cmd[index].arguments[argIndex] = NULL; //execvp()
+        if (parseCommand(index, cmd, command1) != 0) return -8; //Pass everything BEFORE delim
 
         return numPipes;
 }
@@ -334,7 +342,7 @@ void prepareExternalProcess(char *cmdString, stringStack *directoryStack)
         if (strlen(cmdString) == 0) return;
 
         /*Parse*/
-        numPipes = parseCommand(0, cmd, cmdString);
+        numPipes = parseDelimiters(0, cmd, cmdString);
 
         /*Post-parse error management*/
         if(errorManagement(numPipes) != EXIT_SUCCESS) return;
