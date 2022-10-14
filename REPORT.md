@@ -88,8 +88,10 @@ requires special attention. This includes the built-in commands (`cd`, `pwd`,
    printing the stored directories from top to bottom within the *StringStack*.  
    `pushd` first pushes the current working directory to the stack using `pop()`,  
    then changes the directory.  
-   `popd` must use `pop()` before changing directory. This is because the `pop()`  
-   function checks if an empty 
+   `popd` must use `pop()` before changing directories. This so that `sshell`  
+   can check if the *StringStack* is empty before trying to change directories.
+   
+###
 
 
 
