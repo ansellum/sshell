@@ -39,34 +39,57 @@ expands on its  `push()` and `pop()` functions for use with directory names
 The implementation of this program follows five distinct steps:
 
 1. Parse the user input using a command struct for organization
-2. Check for errors
-3. Check for special commands
+2. Error Management
+3. Special Commands
 4. Execute user input
 5. Repeat
 
 ### Parse User Input
 
-At the  beginning of its execution, `sshell` will capture user input and build a  
-StringStack data structure which will be used for the directory stack feature. This  
-StringStack structure is a single object containing stack properties and two  
+At the beginning of its execution, `sshell` will capture user input and build a  
+*StringStack* data structure which will be used for the directory stack. This  
+data structure is a single object containing stack properties and two  
 functions which help interact with the stack (`push()` and `pop()`). The user  
 input is immedietely parsed using two phases, one for delimiters  
 (`parseDelimiter()`) and one for a **single command** (`parseCommand()`).
 
-The first phase parses delimiters for I/O redirection and piping, skipping  
-command execution if a parsing error is detected. This is done by utilizing  
-unique return values which indicate the type of parsing error. If this phase  
-detects a `>` or  `<` character in the command line, it will store the name and  
-existence of the file using global variables. If this phase detects a `|`  
-character, it will call `parseDelimiter()` again, passing a substring containing  
-everything that was beyond the pipe character. This substring will be checked  
-for the delimiters again, and this process will recurse until no more pipes are  
-found.
+The first phase parses delimiters for I/O redirection and piping, returning  
+if a parsing error is detected. This is done returning unique negative values  
+which indicate the type of parsing error. If this phase detects a `>` or `<`  
+character in the command line, it will note the file's existence using global  
+variables. If this phase detects a `|` character, it will recursively call  
+`parseDelimiter()`, passing the string that was beyond the pipe character, until  
+there are no more pipe characters detected. This creates multiple layers of  
+`parseDelimiter()`, each with a single command that passes to `parseCommand()'.
 
-The second phase of the parse takes a command string with no delimiters (`<`,`>`,
-`|`) and seperates by the spaces. It does this by utilizing `strsep()`, which  
-allows a while loop to iteratively chop up the command string  
-and store them in the correct property.
-array relies on `parseDelimiter()`'s recursive  
-characteristic; in fact, `parseCommand()` is called at the end of  
-`parseDelimiter()` (The seperation is to enforce single-purpose functions).
+The second phase of the parse takes the command string passed by  
+`parseDelimiter()` and parses it into a *commandObj* data structure. This data  
+structure contains string fields for the program name and arguments, as well as  
+a field for the number of arguments (this is useful for execution). Parsing is  
+accomplished using `strsep()` to separate the command string and a while loop to  
+iteratively stores each argument in the data structure.
+
+### Error Management
+
+If there is a parsing error from the parse step, `numPipes` will be set to a  
+unique negative value. This value is passed to `errorManagement()`, which will  
+decipher the error and return from execution (i.e. trash the command line and  
+ask for another).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
