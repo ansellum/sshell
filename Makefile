@@ -5,4 +5,4 @@ sshell: sshell.c stringstack.c
 	$(CC) $(CFLAGS) stringstack.c sshell.c -o sshell
 
 clean:
-	rm -rf sshell *.txt
+	rm -rf sshell *.txt *.o

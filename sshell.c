@@ -60,45 +60,6 @@ int printWorkingDirectory()
         return 0;
 }
 
-/*Executes an external command with fork(), execvp(), & waitpid() */
-void executePipeline(int fd[][2], int exitval[], commandObj* cmd, int numPipes, const int index)
-{
-        int status;
-        int pid = fork();
-
-        if (pid == 0) { //Child process
-
-                if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless it's the first command
-                else if (iRedirectSymbolDetected)       redirectInput(fd[index][0]);
-
-                if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless it's the last command
-                else if (oRedirectSymbolDetected)       redirectOutput(fd[index][1]);               //check if filename is detected, and execute redirection
-
-                //close all pipes
-                for (int i = 0; i < numPipes; ++i)
-                {
-                        close(fd[i][0]);
-                        close(fd[i][1]);
-                }
-                //execute program
-                execvp(cmd[index].program, cmd[index].arguments);
-                if (errno = ENOENT) fprintf(stderr, "Error: command not found\n");
-                exit(EXIT_FAILURE);
-        }
-        else if (pid > 0) { //Parent process
-                if (index < numPipes) executePipeline(fd, exitval, cmd, numPipes, index + 1);
-
-                //close all pipes
-                for (int i = 0; i < numPipes; ++i)
-                {
-                        close(fd[i][0]);
-                        close(fd[i][1]);
-                }
-        }
-        waitpid(pid, &status, 0);
-        if (WIFEXITED(status)) exitval[index] = WEXITSTATUS(status);
-}
-
 int parseCommand(const int index, commandObj* cmd, char* command1)
 {
         int argIndex = 1;
@@ -191,6 +152,7 @@ int parseDelimiters(const int index, commandObj* cmd, char* cmdString)
         return numPipes;
 }
 
+/*Handle parsing errors*/
 int errorManagement(int error)
 {
         switch (error) {
@@ -290,7 +252,7 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
         }        
         if (!strcmp(cmd.program, "popd"))
         {
-                char* prevDirectory;
+                char* prevDirectory;   
 
                 if (cmd.arguments[1] != NULL)
                 {
@@ -299,7 +261,7 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
                         return 1;
                 }
 
-                prevDirectory = pop(directoryStack);
+                prevDirectory = pop(directoryStack);    // Check if stack is empty BEFORE changing directories
                 if (prevDirectory == NULL)
                 {
                         fprintf(stderr, "Error: directory stack empty\n");
@@ -334,6 +296,46 @@ int specialCommands(commandObj cmd, char* cmdString, stringStack *directoryStack
         return 0;
 }
 
+/*Executes an external command with fork(), execvp(), & waitpid() */
+void executePipeline(int fd[][2], int exitval[], commandObj* cmd, int numPipes, const int index)
+{
+        int status;
+        int pid = fork();
+
+        if (pid == 0) { //Child process
+
+                if (index > 0)                          dup2(fd[index - 1][0], STDIN_FILENO);   //redirect stdin to read pipe,  unless first 
+                else if (iRedirectSymbolDetected)       redirectInput(fd[index][0]);            //if first  and '<', redirect
+
+                if (index < numPipes)                   dup2(fd[index][1], STDOUT_FILENO);      //redirect stdout to write pipe, unless last 
+                else if (oRedirectSymbolDetected)       redirectOutput(fd[index][1]);           //if last and '>', redirect
+
+                //close all pipes
+                for (int i = 0; i < numPipes; ++i)
+                {
+                        close(fd[i][0]);
+                        close(fd[i][1]);
+                }
+                //execute program
+                execvp(cmd[index].program, cmd[index].arguments);
+                if (errno = ENOENT) fprintf(stderr, "Error: command not found\n");
+                exit(EXIT_FAILURE);
+        }
+        else if (pid > 0) { //Parent process
+                if (index < numPipes) executePipeline(fd, exitval, cmd, numPipes, index + 1);
+
+                //close all pipes
+                for (int i = 0; i < numPipes; ++i)
+                {
+                        close(fd[i][0]);
+                        close(fd[i][1]);
+                }
+        }
+        waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) exitval[index] = WEXITSTATUS(status);
+}
+
+/*The Controller: manages flow of parsing and executing command line*/
 void prepareExternalProcess(char *cmdString, stringStack *directoryStack)
 {
         int numPipes;
@@ -361,15 +363,17 @@ void prepareExternalProcess(char *cmdString, stringStack *directoryStack)
         }
         executePipeline(fd, exitval, cmd, numPipes, 0);
 
+        /*Reset global variables*/
         oRedirectSymbolDetected = 0;
         iRedirectSymbolDetected = 0;
         oFile = "";
         iFile = "";
 
+        /*Command line executed completely*/
         fprintf(stderr, "+ completed '%s' ", cmdString);
-        for (int i = 0; i < numPipes + 1; ++i)
+        for (int i = 0; i < numPipes + 1; ++i)  // Recusively print exit values
         {
-                fprintf(stderr, "[%d]", exitval[i]);  //Print exit values
+                fprintf(stderr, "[%d]", exitval[i]);
         }
         fprintf(stderr, "\n");
 
