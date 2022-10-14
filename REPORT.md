@@ -158,7 +158,7 @@ executePipeline() {
 ```
 
 #### Child Process  
-A single child process prepares and executes the *commandObj* that its `index`
+A single child process prepares and executes the *commandObj* that its `index`  
 correlates to. For example, the first child will run the first command, the  
 second child will run the second command, etc. First, the child compares  
 `index`'s value to 0 and the number of pipes in order to determine its order in  
