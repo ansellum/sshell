@@ -125,7 +125,7 @@ which correlates to printing the stored directories from top to bottom within
 the *StringStack*.  
 `pushd` first pushes the current working directory to the stack using  
 *StringStack*'s `push()` function, then changes the directory using the  
-`changeDirectory()` function.
+`changeDirectory()` function.  
 `popd` uses must use `pop()` before changing directories. This so that `sshell`  
 can check if the *StringStack* is empty before trying to change directories.
 
@@ -141,7 +141,7 @@ different code that is seperated by comparing their PIDs.
 The parent process first checks if there are multiple commands by comparing the  
 current command's index to the number of pipes. If there are multiple commands  
 (i.e. a pipe exists), it will start a recursive call to `executePipeline()`.  
-This call will fork another child process and then check for another command. 
+This call will fork another child process and then check for another command.  
 Once the necessary amount of child processes are forked, the parent will `wait()`  
 for the death of all of its children before continuing. 
 
@@ -196,7 +196,7 @@ executePipeline()
 }
 ```
 
-#### Recursion
+#### Note about Recursion
 The idea behind using recursion for execution was to iteratively fork enough  
 child processes in order to run each command. Each of these child processes runs  
 concurrently with one another, since child processes never call to `wait()`. It  
@@ -208,9 +208,9 @@ child processes.
 `sshell`'s main function is comprised of a while loop that repeat this process.  
 The while loop first prints `sshell@ucd$ ` and then waits for user input. After  
 capturing it, it then passes it and an empty directory stack to  
-`prepareExternalProcess()` for use. `prepareExternalProcess()` then performs the  
-above actions through the described functions and in the described order. Repeat  
-ad infinitum until `sshell` receives a signal that causes it to terminate.
+`prepareExternalProcess()` for use. `prepareExternalProcess()` then performs  
+the  above actions through the described functions and in the described order.  
+Repeat ad infinitum until `sshell` receives a signal that causes it to terminate.
 
 
 
